@@ -1,0 +1,17 @@
+/axioms.o
+/best_first_search.o
+/closed_list.o
+/domain_transition_graph.o
+/ff_heuristic.o
+/globals.o
+/open_list.o
+/operator.o
+/planner.o
+/search_engine.o
+/successor_generator.o
+/wa_star_search.o
+/landmarks_count_heuristic.o
+/landmarks_graph.o
+/landmarks_graph_rpg_sasp.o
+/state.o
+/heuristic.o
