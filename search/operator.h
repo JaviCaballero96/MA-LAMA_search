@@ -52,11 +52,12 @@ struct Prevail {
 struct PrePost {
     int var;
     int pre, post;
+    float f_cost;
     std::vector<Prevail> cond;
     PrePost() {} // Needed for axiom file-reading constructor, unfortunately.
     PrePost(std::istream &in);
-    PrePost(int v, int pr, int po, const std::vector<Prevail> &co)
-	: var(v), pre(pr), post(po), cond(co) {}
+    PrePost(int v, int pr, int po, float f_co, const std::vector<Prevail> &co)
+	: var(v), pre(pr), post(po), f_cost(f_co), cond(co) {}
 
     bool is_applicable(const State &state) const {
 	assert(var >= 0 && var < g_variable_name.size());
@@ -79,7 +80,7 @@ class Operator {
     std::vector<Prevail> prevail;      // var, val
     std::vector<PrePost> pre_post;     // var, old-val, new-val, effect conditions
     std::string name;
-    int cost;
+    float cost;
 public:
     Operator(std::istream &in, bool is_axiom);
     void dump() const;
@@ -99,7 +100,7 @@ public:
 		return false;
 	return true;
     }
-    int get_cost() const {return cost;}
+    float get_cost() const {return cost;}
 };
 
 #endif

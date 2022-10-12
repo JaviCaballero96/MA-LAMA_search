@@ -184,7 +184,9 @@ int LandmarksGraphNew::min_cost_for_landmark(LandmarkNode* bp,
 	    // and calculate the minimum cost of those that can make
 	    // bp true for the first time according to lvl_var
             if(_possibly_reaches_lm(op, lvl_var, bp)) 
-		min_cost = min(min_cost, op.get_cost());
+
+        // TO DO: float
+		min_cost = min(float(min_cost), op.get_cost());
         }
     }
     assert(min_cost < INT_MAX);

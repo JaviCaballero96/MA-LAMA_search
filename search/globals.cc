@@ -50,8 +50,18 @@ void check_magic(istream &in, string magic) {
 }
 
 void read_metric(istream &in) {
+  string metric_aux = "";
+
   check_magic(in, "begin_metric");
-  in >> g_use_metric;
+  g_use_metric = true;
+  in >> g_op_metric;
+  while(true)
+  {
+	  in >> metric_aux;
+	  if (metric_aux == "end")
+		  break;
+	  g_n_metric.push_back(atoi(metric_aux.c_str()));
+  }
   check_magic(in, "end_metric");
 }
 
@@ -157,6 +167,8 @@ void dump_everything() {
 }
 
 bool g_use_metric;
+string g_op_metric;
+vector <int> g_n_metric;
 vector<string> g_variable_name;
 vector<int> g_variable_domain;
 vector<int> g_axiom_layers;

@@ -60,6 +60,8 @@ int main(int argc, const char **argv) {
     bool reasonable_orders = true;
     bool iterative_search = false;
 
+    std::fstream fs;
+
     enum {wa_star, bfs} search_type = bfs;
     if(argc < 2 || argc > 3) {
 	std::cout << "Usage: \"search options [outputfile]\"\n";
@@ -86,12 +88,15 @@ int main(int argc, const char **argv) {
 	if(argc == 3)
 	    plan_filename = argv[2];
     }
+
+    fs.open (argv[2], std::fstream::in);
+
     if(!ff_heuristic && !landmarks_heuristic) {
 	cerr << "Error: you must select at least one heuristic!" << endl
 	     << "If you are unsure, choose options \"fFlL\"." << endl;
 	return 2;
     }
-    cin >> poly_time_method;
+    fs >> poly_time_method;
     if(poly_time_method) {
 	cout << "Poly-time method not implemented in this branch." << endl;
 	cout << "Starting normal solver." << endl;
@@ -104,7 +109,7 @@ int main(int argc, const char **argv) {
     if(landmarks_heuristic || landmarks_preferred_operators) 
 	generate_landmarks = true;
     times(&landmarks_generation_start);
-    read_everything(cin, generate_landmarks, reasonable_orders);
+    read_everything(fs, generate_landmarks, reasonable_orders);
     // dump_everything();
     times(&landmarks_generation_end);
     int landmarks_generation_ms = (landmarks_generation_end.tms_utime - 

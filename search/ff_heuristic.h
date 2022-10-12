@@ -40,9 +40,18 @@ class State;
 class Proposition;
 class UnaryOperator;
 
+enum func_operations {
+    NO_OPP = 0,
+    INCREASE = 1,
+    DECREASE = 2,
+    ASSIGN = 3
+};
+
 struct Proposition {
     int var;
     int val;
+    func_operations func_op;
+    float func_val = 0;
     bool is_goal_condition;
     bool is_termination_condition;
     std::vector<UnaryOperator *> precondition_of;
@@ -56,6 +65,7 @@ struct Proposition {
     Proposition() {
 	is_goal_condition = false;
 	is_termination_condition = false;
+	func_op = NO_OPP;
 	h_add_cost = -1;
 	h_max_cost = -1;
 	reached_by = 0;

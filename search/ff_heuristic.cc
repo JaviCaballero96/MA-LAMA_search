@@ -39,6 +39,7 @@ FFHeuristic::FFHeuristic(bool use_cache)
     cout << "Initializing HSP/FF heuristic..." << endl;
 
     // Build propositions.
+    // Propositions is a double array with var number and possible values
     for(int var = 0; var < g_variable_domain.size(); var++) {
         propositions.push_back(vector<Proposition>(g_variable_domain[var])); 
         for(int val = 0; val < g_variable_domain[var]; val++) {
@@ -48,19 +49,23 @@ FFHeuristic::FFHeuristic(bool use_cache)
     }
       
     // Build goal propositions.
+    // propositions that are goals are set to goal
+    //    condition and termination condition
+    // goal propositions are direct references to goals in the propositions array
+    // termination_propositions are direct references to goals in the propositions array
     for(int i = 0; i < g_goal.size(); i++) {
-	int var = g_goal[i].first, val = g_goal[i].second;
-	propositions[var][val].is_goal_condition = true;
-	propositions[var][val].is_termination_condition = true;
-	goal_propositions.push_back(&propositions[var][val]);
-	termination_propositions.push_back(&propositions[var][val]);
+    	int var = g_goal[i].first, val = g_goal[i].second;
+    	propositions[var][val].is_goal_condition = true;
+    	propositions[var][val].is_termination_condition = true;
+    	goal_propositions.push_back(&propositions[var][val]);
+    	termination_propositions.push_back(&propositions[var][val]);
     }
 
     // Build unary operators for operators and axioms.
     for(int i = 0; i < g_operators.size(); i++)
-	build_unary_operators(g_operators[i]);
+    	build_unary_operators(g_operators[i]);
     for(int i = 0; i < g_axioms.size(); i++)
-	build_unary_operators(g_axioms[i]);
+    	build_unary_operators(g_axioms[i]);
 
     // Cross-reference unary operators.
     for(int i = 0; i < unary_operators.size(); i++) {
@@ -116,7 +121,7 @@ void FFHeuristic::build_unary_operators(const Operator &op) {
 	precondition_var_vals1.push_back(make_pair(prevail[i].var, prevail[i].prev));
     }
     for(int i = 0; i < pre_post.size(); i++)
-	if(pre_post[i].pre != -1) {
+	if((pre_post[i].pre != -1) && (pre_post[i].pre != -2) && (pre_post[i].pre != -3) && (pre_post[i].pre != -4))  {
 	    assert(pre_post[i].var >= 0 && pre_post[i].var < g_variable_domain.size());
 	    assert(pre_post[i].pre >= 0 && pre_post[i].pre < g_variable_domain[pre_post[i].var]);
 	    // precondition.push_back(&propositions[pre_post[i].var][pre_post[i].pre]);
@@ -124,27 +129,39 @@ void FFHeuristic::build_unary_operators(const Operator &op) {
 	}
     for(int i = 0; i < pre_post.size(); i++) {
         vector<pair<int,int> > precondition_var_vals2(precondition_var_vals1);
-	assert(pre_post[i].var >= 0 && pre_post[i].var < g_variable_domain.size());
-	assert(pre_post[i].post >= 0 && pre_post[i].post < g_variable_domain[pre_post[i].var]);
-	Proposition *effect = &propositions[pre_post[i].var][pre_post[i].post];
-	const vector<Prevail> &eff_cond = pre_post[i].cond;
-	for(int j = 0; j < eff_cond.size(); j++) {
-	    assert(eff_cond[j].var >= 0 && eff_cond[j].var < g_variable_domain.size());
-	    assert(eff_cond[j].prev >= 0 && eff_cond[j].prev < g_variable_domain[eff_cond[j].var]);
-	    // precondition.push_back(&propositions[eff_cond[j].var][eff_cond[j].prev]);
-	    precondition_var_vals2.push_back(make_pair(eff_cond[j].var, eff_cond[j].prev));
-	}
+        assert(pre_post[i].var >= 0 && pre_post[i].var < g_variable_domain.size());
+        assert(pre_post[i].post >= 0 && pre_post[i].post < g_variable_domain[pre_post[i].var]);
+        if(pre_post[i].pre == -2){
+        	(propositions[pre_post[i].var][pre_post[i].post]).func_op = INCREASE;
+        	(propositions[pre_post[i].var][pre_post[i].post]).func_val = pre_post[i].f_cost;
+        }
+        if(pre_post[i].pre == -3){
+        	(propositions[pre_post[i].var][pre_post[i].post]).func_op = DECREASE;
+            (propositions[pre_post[i].var][pre_post[i].post]).func_val = pre_post[i].f_cost;
+        }
+        if(pre_post[i].pre == -4){
+        	(propositions[pre_post[i].var][pre_post[i].post]).func_op = ASSIGN;
+        	(propositions[pre_post[i].var][pre_post[i].post]).func_val = pre_post[i].f_cost;
+     	}
+		Proposition *effect = &propositions[pre_post[i].var][pre_post[i].post];
+		const vector<Prevail> &eff_cond = pre_post[i].cond;
+		for(int j = 0; j < eff_cond.size(); j++) {
+	    	assert(eff_cond[j].var >= 0 && eff_cond[j].var < g_variable_domain.size());
+	    	assert(eff_cond[j].prev >= 0 && eff_cond[j].prev < g_variable_domain[eff_cond[j].var]);
+	    	// precondition.push_back(&propositions[eff_cond[j].var][eff_cond[j].prev]);
+	    	precondition_var_vals2.push_back(make_pair(eff_cond[j].var, eff_cond[j].prev));
+		}
 
-	sort(precondition_var_vals2.begin(), precondition_var_vals2.end());
+		sort(precondition_var_vals2.begin(), precondition_var_vals2.end());
 	
-        for(int j = 0; j < precondition_var_vals2.size(); j++)
+    	for(int j = 0; j < precondition_var_vals2.size(); j++)
             precondition.push_back(&propositions[precondition_var_vals2[j].first]
                                    [precondition_var_vals2[j].second]);
-	
-	unary_operators.push_back(UnaryOperator(precondition, effect, &op, base_cost));
-	// precondition.erase(precondition.end() - eff_cond.size(), precondition.end());
-	precondition.clear();
-	precondition_var_vals2.clear();
+
+		unary_operators.push_back(UnaryOperator(precondition, effect, &op, base_cost));
+		// precondition.erase(precondition.end() - eff_cond.size(), precondition.end());
+		precondition.clear();
+		precondition_var_vals2.clear();
     }
 }
 

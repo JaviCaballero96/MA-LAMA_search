@@ -14,8 +14,8 @@ RELEASE_OBJECTS = $(SOURCES:%.cc=%.release.o)
 
 CC = g++
 DEPEND = g++ -MM
-CCOPT =      -Wall -W -Wno-sign-compare -ansi -pedantic -Werror -O3 -Wno-deprecated
-RELEASEOPT = -Wall -W -Wno-sign-compare -ansi -pedantic -Werror -DNDEBUG -O3 -m32 -Wno-deprecated
+CCOPT =      -Wall -W -Wno-sign-compare -ansi -pedantic -Wno-deprecated
+RELEASEOPT = -Wall -W -Wno-sign-compare -ansi -pedantic -DNDEBUG -m32 -Wno-deprecated
 LINKOPT =
 
 ## debug, don't optimize
