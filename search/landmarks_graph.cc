@@ -174,7 +174,7 @@ void LandmarksGraph::read_external_inconsistencies() {
    is true at any point in time. Hence, all facts within a group are mutually exclusive.
  */
     cout << "Reading invariants from file..." << endl;
-    ifstream myfile ("all.groups");
+    ifstream myfile ("/home/javier/Desktop/planners/outPreprocess/all.groups");
     if(myfile.is_open()) {
         ifstream &in = myfile;
         check_magic(in, "begin_groups");
@@ -195,6 +195,7 @@ void LandmarksGraph::read_external_inconsistencies() {
             for(int k = 0; k < g_variable_domain[j]; k++)
                 inconsistent_facts[j].push_back(set<pair<int, int> >());
         }
+
         for(int i = 0; i < no_groups; i++) {
             check_magic(in, "group");
             int no_facts;
@@ -203,14 +204,25 @@ void LandmarksGraph::read_external_inconsistencies() {
             for(int j = 0; j < no_facts; j++) {
                 int var, val, no_args;
                 in >> var >> val;
-                string predicate, endline;
-                in >> predicate >> no_args;
-                vector<string> args;
-                for(int k = 0; k < no_args; k++) {
-                    string arg;
-                    in >> arg;
-                    args.push_back(arg);
+                string predicate, endline, aux;
+                in >> predicate;
+                if ((predicate == "Decrease") ||
+                		(predicate == "Increase") ||
+						(predicate == "Assign")) {
+                	in >> aux;
+                	while (aux != ">") {
+                		predicate = predicate + " " + aux;
+                    	in >> aux;
+                	}
                 }
+				in >> no_args;
+				vector<string> args;
+				for(int k = 0; k < no_args; k++) {
+					string arg;
+					in >> arg;
+					args.push_back(arg);
+				}
+
                 getline(in, endline);
 		// Variable may not be in index if it has been discarded by preprocessor
                 if(variable_index.find(var) != variable_index.end()) {
@@ -305,6 +317,11 @@ bool LandmarksGraph::relaxed_task_solvable(vector<vector<int> >& lvl_var,
 void LandmarksGraph::generate_operators_lookups() {
 /* Build datastructures for efficient landmark computation. Map propositions
    to the operators that achieve them or have them as preconditions */
+
+	/* operators_pre_lookup: [var] [value] -> indexes of operators precond
+	 * operators_eff_lookup: [var] [value] -> indexes of operators effects
+	 * empty_pre_operators: ops with no pre of eff
+	 * */
   
     operators_pre_lookup.resize(g_variable_domain.size());
     operators_eff_lookup.resize(g_variable_domain.size());
@@ -318,7 +335,8 @@ void LandmarksGraph::generate_operators_lookups() {
         const vector<PrePost>& prepost = op.get_pre_post();
         bool no_pre = true;
         for (unsigned j = 0; j < prepost.size(); j++) {
-            if(prepost[j].pre != -1) {
+            if((prepost[j].pre != -1) && (prepost[j].pre != -2) &&
+            		(prepost[j].pre != -3) && (prepost[j].pre != -4)) {
                 no_pre = false;
                 operators_pre_lookup[prepost[j].var][prepost[j].pre].push_back(i);
             }

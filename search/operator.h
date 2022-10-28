@@ -61,7 +61,8 @@ struct PrePost {
 
     bool is_applicable(const State &state) const {
 	assert(var >= 0 && var < g_variable_name.size());
-	assert(pre == -1 || (pre >= 0 && pre < g_variable_domain[var]));
+	assert(pre == -1 || pre == -2 || pre == -3 || pre == -4 ||
+			(pre >= 0 && pre < g_variable_domain[var]));
 	return pre == -1 || state[var] == pre;
     }
 

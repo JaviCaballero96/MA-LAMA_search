@@ -120,11 +120,11 @@ void LandmarksGraphNew::get_greedy_preconditions_for_lm(const LandmarkNode *lmp,
             result.insert(make_pair(prepost[j].var, prepost[j].pre));
         }
         else if(g_variable_domain[prepost[j].var] == 2) 
-	    for(int i = 0; i < lmp->vars.size(); i++) 
-		if(lmp->vars[i] == prepost[j].var && 
-		   (*g_initial_state)[prepost[j].var] != lmp->vals[i]) {
-		       result.insert(make_pair(prepost[j].var, (*g_initial_state)[prepost[j].var]));
-		       break;
+        	for(int i = 0; i < lmp->vars.size(); i++)
+        		if(lmp->vars[i] == prepost[j].var &&
+        				(*g_initial_state)[prepost[j].var] != lmp->vals[i]) {
+        			result.insert(make_pair(prepost[j].var, (*g_initial_state)[prepost[j].var]));
+        			break;
 		   }
     const vector<Prevail> prevail = o.get_prevail();
     for(unsigned j = 0; j < prevail.size(); j++)
@@ -173,7 +173,7 @@ int LandmarksGraphNew::min_cost_for_landmark(LandmarkNode* bp,
    time (according to lvl_var) */
 
     assert(!lvl_var.empty());
-    int min_cost = INT_MAX;
+    float min_cost = FLT_MAX;
     // For each proposition in bp...
     for(unsigned int k = 0; k < bp->vars.size(); k++) {
         pair<int, int> b = make_pair(bp->vars[k], bp->vals[k]);
@@ -189,7 +189,8 @@ int LandmarksGraphNew::min_cost_for_landmark(LandmarkNode* bp,
 		min_cost = min(float(min_cost), op.get_cost());
         }
     }
-    assert(min_cost < INT_MAX);
+
+    assert(min_cost < FLT_MAX);
     return min_cost;
 }
 
@@ -382,9 +383,9 @@ void LandmarksGraphNew::generate_landmarks() {
     relaxed_task_solvable(true, NULL);
     cout << "Generating landmarks using the RPG/SAS+ approach\n";
     for(unsigned i = 0; i < g_goal.size(); i++) {
-	LandmarkNode& lmn = landmark_add_simple(g_goal[i]);
-	lmn.in_goal = true;
-	open_landmarks.push_back(&lmn);
+		LandmarkNode& lmn = landmark_add_simple(g_goal[i]);
+		lmn.in_goal = true;
+		open_landmarks.push_back(&lmn);
     }
     while(!open_landmarks.empty()) {
         LandmarkNode* bp = open_landmarks.front();
@@ -406,7 +407,8 @@ void LandmarksGraphNew::generate_landmarks() {
 	    compute_shared_preconditions(shared_pre, lvl_var, bp);
 	    // All such shared preconditions are landmarks, and greedy necessary predecessors of bp.
             for(hash_map<int, int>::iterator it = shared_pre.begin(); it != shared_pre.end(); it++){
-                found_lm_and_order(*it, *bp, gn);
+            	if ((it->second != -2) && (it->second != -3) && (it->second != -4))
+                	found_lm_and_order(*it, *bp, gn);
             }
             // Extract additional orders from relaxed planning graph and DTG.
 	    approximate_lookahead_orders(lvl_var, bp);

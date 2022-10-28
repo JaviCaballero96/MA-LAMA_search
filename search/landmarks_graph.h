@@ -30,6 +30,7 @@
 #include <list>
 #include <ext/hash_set>
 #include <cassert>
+#include <cfloat>
 
 #include "operator.h"
 #include "landmarks_types.h"

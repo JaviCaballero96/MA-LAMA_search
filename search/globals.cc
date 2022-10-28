@@ -120,6 +120,7 @@ void read_axioms(istream &in) {
 }
 
 void build_landmarks_graph(bool reasonable_orders) {
+	/* The operators are iondexed by its propositions as preconditions and effects */
     g_lgraph = new LandmarksGraphNew();
     g_lgraph->read_external_inconsistencies();
     if(reasonable_orders) {

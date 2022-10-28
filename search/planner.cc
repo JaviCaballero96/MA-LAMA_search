@@ -54,6 +54,7 @@ int main(int argc, const char **argv) {
     times(&start);
     bool poly_time_method = false;
     string plan_filename = "sas_plan";
+    string name = "";
     
     bool ff_heuristic = false, ff_preferred_operators = false;
     bool landmarks_heuristic = false, landmarks_preferred_operators = false;
@@ -90,6 +91,8 @@ int main(int argc, const char **argv) {
     }
 
     fs.open (argv[2], std::fstream::in);
+
+    fs >> name;
 
     if(!ff_heuristic && !landmarks_heuristic) {
 	cerr << "Error: you must select at least one heuristic!" << endl
