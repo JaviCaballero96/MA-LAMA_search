@@ -224,7 +224,7 @@ int main(int argc, const char **argv) {
 
 int save_plan(const vector<const Operator *> &plan, const string& filename, int iteration) {
     ofstream outfile;
-    int plan_cost = 0;
+    float plan_cost = 0;
     bool separate_outfiles = true; // IPC conditions, change to false for a single outfile.
     if(separate_outfiles) {
 	// Write a separat output file for each plan found by iterative search
@@ -237,9 +237,10 @@ int save_plan(const vector<const Operator *> &plan, const string& filename, int 
 	outfile.open(filename.c_str(), ios::out);
     }
     for(int i = 0; i < plan.size(); i++) {
-	int action_cost =  plan[i]->get_cost();
+	float action_cost =  plan[i]->get_cost();
 	if(g_use_metric)
-	    action_cost--; // Note: action costs have all been increased by 1 to deal with 0-cost actions
+	    action_cost = action_cost - 1;
+	cout << "Coste del paso: " << action_cost << endl;// Note: action costs have all been increased by 1 to deal with 0-cost actions
 	plan_cost += action_cost;
 	if(!g_use_metric)
 	    cout << plan[i]->get_name() << endl;
