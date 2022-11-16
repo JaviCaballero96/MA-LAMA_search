@@ -30,13 +30,13 @@
 class WAStarSearchEngine : public BestFirstSearchEngine {
 private:
     int weight;
-    int bound;
+    float bound;
     void debug_print_partial_plan(const State& state);
 protected:
     virtual void initialize();
     virtual int step();
     virtual void generate_successors(const State *parent_ptr);
 public:
-    WAStarSearchEngine(int w=1, int b=-1);
+    WAStarSearchEngine(int w=1, float b=-1);
 };
 #endif

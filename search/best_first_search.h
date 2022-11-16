@@ -35,10 +35,10 @@ class Operator;
 //typedef pair<const State *, const Operator *> OpenListEntry;
 
 struct OpenListEntry {
-    OpenListEntry(const State *parent, const Operator *op, int parent_heur);
+    OpenListEntry(const State *parent, const Operator *op, float parent_heur);
     const State *parent; 
     const Operator *op; 
-    int parent_heur;
+    float parent_heur;
 };
 
 struct OpenListInfo {

@@ -28,6 +28,8 @@
 #include "globals.h"
 #include "operator.h"
 #include "landmarks_graph.h"
+#include "float.h"
+#include "ff_heuristic.h"
 
 #include <algorithm>
 #include <iostream>
@@ -37,9 +39,17 @@ using namespace std;
 State::State(istream &in) {
     check_magic(in, "begin_state");
     for(int i = 0; i < g_variable_domain.size(); i++) {
-	int var;
-	in >> var;
-	vars.push_back(var);
+    	int var;
+    	float var_val;
+    	in >> var;
+    	if (var == -1){
+    		vars.push_back(var);
+    		in >> var_val;
+    		numerc_vars_val.push_back(var_val);
+    	}else{
+    		vars.push_back(var);
+    		numerc_vars_val.push_back(FLT_MAX);
+    	}
     }
     check_magic(in, "end_state");
 
@@ -101,27 +111,46 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     update_reached_lms(new_op);
     g_value = new_predecessor.get_g_value() + new_op.get_cost();
     if (g_use_metric) // if using action costs, all costs have been increased by 1
-	g_value--;
+	g_value = g_value - 1;
 }
 
 State::State(const State &predecessor, const Operator &op)
-    : vars(predecessor.vars), reached_lms(predecessor.reached_lms), 
-      reached_lms_cost(predecessor.reached_lms_cost) {
+    : vars(predecessor.vars), numerc_vars_val(predecessor.numerc_vars_val),
+	  reached_lms(predecessor.reached_lms), reached_lms_cost(predecessor.reached_lms_cost) {
     assert(!op.is_axiom());
 
     // Update values affected by operator.
     for(int i = 0; i < op.get_pre_post().size(); i++) {
-	const PrePost &pre_post = op.get_pre_post()[i];
-	if(pre_post.does_fire(predecessor))
-	    vars[pre_post.var] = pre_post.post;
-    }
+		const PrePost &pre_post = op.get_pre_post()[i];
+		if(pre_post.does_fire(predecessor)){
+			switch(pre_post.pre){
+			case -2:
+				vars[pre_post.var] = pre_post.post;
+				numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] + pre_post.f_cost;
+				break;
+
+			case -3:
+				numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] - pre_post.f_cost;
+				vars[pre_post.var] = pre_post.post;
+				break;
+
+			case -4:
+				numerc_vars_val[pre_post.var] = pre_post.f_cost;
+				vars[pre_post.var] = pre_post.post;
+				break;
+
+			default:
+				vars[pre_post.var] = pre_post.post;
+			}
+		}
+	}
     g_axiom_evaluator->evaluate(*this);
     // Update set of reached landmarks.
     update_reached_lms(op);
     // Update g_value
     g_value = predecessor.get_g_value() + op.get_cost();
     if (g_use_metric) // if using action costs, all costs have been increased by 1
-	g_value--;
+	g_value = g_value - 1;
 }
 
 void State::dump() const {

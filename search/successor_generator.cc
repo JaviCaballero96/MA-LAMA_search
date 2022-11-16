@@ -34,6 +34,8 @@ class SuccessorGeneratorSwitch : public SuccessorGenerator {
     SuccessorGenerator *immediate_ops;
     vector<SuccessorGenerator *> generator_for_value;
     SuccessorGenerator *default_generator;
+    virtual void check_functional_validity(
+    		const State &curr, vector<const Operator *> &ops);
 public:
     SuccessorGeneratorSwitch(istream &in);
     virtual void generate_applicable_ops(const State &curr,
@@ -63,6 +65,36 @@ void SuccessorGeneratorSwitch::generate_applicable_ops(
     immediate_ops->generate_applicable_ops(curr, ops);
     generator_for_value[curr[switch_var]]->generate_applicable_ops(curr, ops);
     default_generator->generate_applicable_ops(curr, ops);
+    check_functional_validity(curr, ops);
+}
+
+void SuccessorGeneratorSwitch::check_functional_validity(
+		const State &curr, vector<const Operator *> &ops) {
+	vector<const Operator *>::iterator it = ops.begin();
+	for(; it != ops.end();) {
+		const Operator * op = *it;
+		bool op_valid = true;
+		vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
+		for(; it_pp != op->get_pre_post().end(); ++it_pp) {
+			PrePost pp = *it_pp;
+			if(pp.pre == -3)
+			{
+				float f_result = curr.numerc_vars_val[pp.var] - pp.f_cost;
+				if (f_result < 0) {
+					op_valid = false;
+					break;
+				}
+			}
+
+			if(!op_valid)
+				break;
+		}
+
+		if (!op_valid){
+			it = ops.erase(it);
+		}else
+			it++;
+	}
 }
 
 void SuccessorGeneratorSwitch::_dump(string indent) {

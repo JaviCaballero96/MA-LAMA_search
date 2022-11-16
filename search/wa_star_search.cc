@@ -31,7 +31,7 @@
 using namespace std;
 
 
-WAStarSearchEngine::WAStarSearchEngine(int w, int b)
+WAStarSearchEngine::WAStarSearchEngine(int w, float b)
     : BestFirstSearchEngine() {
     weight = w;
     bound = b;
@@ -60,7 +60,7 @@ int WAStarSearchEngine::step() {
     // - current_operator is the operator which leads to current_state from predecessor.
 
     // Evaluate only if g-cost of state is lower than bound
-    if(bound != -1 && current_state.get_g_value() >= bound) { 
+    if(bound != float(-1) && current_state.get_g_value() >= bound) {
 	return fetch_next_state();
     }
 
@@ -120,9 +120,9 @@ void WAStarSearchEngine::generate_successors(const State *parent_ptr) {
     for(int i = 0; i < open_lists.size(); i++) {
 	Heuristic *heur = open_lists[i].heuristic;
 	if(!heur->is_dead_end()) {
-	    int parent_h = heur->get_heuristic();
-	    int parent_g = parent_ptr->get_g_value();
-	    int parent_f = weight * parent_h + parent_g;
+	    float parent_h = heur->get_heuristic();
+	    float parent_g = parent_ptr->get_g_value();
+	    float parent_f = weight * parent_h + parent_g;
 	    OpenList<OpenListEntry> &open = open_lists[i].open;
 	    vector<const Operator *> &ops =
 		open_lists[i].only_preferred_operators ?

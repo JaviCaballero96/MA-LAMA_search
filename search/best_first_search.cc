@@ -39,7 +39,7 @@ OpenListInfo::OpenListInfo(Heuristic *heur, bool only_pref) {
     priority = 0;
 }
 
-OpenListEntry::OpenListEntry(const State *_parent, const Operator *_op, int _parent_heur) {
+OpenListEntry::OpenListEntry(const State *_parent, const Operator *_op, float _parent_heur) {
     parent = _parent;
     op = _op;
     parent_heur = _parent_heur;
@@ -218,7 +218,7 @@ void BestFirstSearchEngine::generate_successors(const State *parent_ptr) {
 		// Tie braker criterium ensures breadth-first search on plateaus
 		// (will be equal to depth of node if no action costs are used,
 		// and cost of node otherwise)
-		int tie_braker = parent_ptr->get_g_value() + ops[j]->get_cost();
+		float tie_braker = parent_ptr->get_g_value() + ops[j]->get_cost();
 		open.insert(make_pair(h, tie_braker), 
 			    OpenListEntry(parent_ptr, ops[j], h));
 	    }

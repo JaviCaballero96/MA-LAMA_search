@@ -42,7 +42,7 @@
 using namespace std;
 
 
-int save_plan(const vector<const Operator *> &plan, const string& filename, int iteration);
+float save_plan(const vector<const Operator *> &plan, const string& filename, int iteration);
 
 void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators, 
 			   bool landmarks_heuristic, 
@@ -140,7 +140,7 @@ int main(int argc, const char **argv) {
     int iteration_no = 0;
     bool solution_found = false;
     int wa_star_weights[] = {10, 5, 3, 2, 1, -1};
-    int wastar_bound = -1;
+    float wastar_bound = -1;
     g_ff_heur = NULL;
     int wastar_weight = wa_star_weights[0];
     bool reducing_weight = true;
@@ -186,7 +186,7 @@ int main(int argc, const char **argv) {
 	times(&search_start);
 	engine->search();
 	times(&search_end);
-	int plan_cost = INT_MAX;
+	float plan_cost = FLT_MAX;
 	if(engine->found_solution())
 	    plan_cost = save_plan(engine->get_plan(), plan_filename, iteration_no);
 
@@ -203,7 +203,7 @@ int main(int argc, const char **argv) {
 
 	// Set new parameters for next search
 	search_type = wa_star;
-	wastar_bound = plan_cost;
+	wastar_bound = plan_cost - 0.1;
 	if(wastar_weight <= 2) { // make search less greedy
 	    ff_preferred_operators = false;
 	    landmarks_preferred_operators = false;
@@ -222,7 +222,7 @@ int main(int argc, const char **argv) {
     return solution_found ? 0 : 1; 
 }
 
-int save_plan(const vector<const Operator *> &plan, const string& filename, int iteration) {
+float save_plan(const vector<const Operator *> &plan, const string& filename, int iteration) {
     ofstream outfile;
     float plan_cost = 0;
     bool separate_outfiles = true; // IPC conditions, change to false for a single outfile.
@@ -240,7 +240,7 @@ int save_plan(const vector<const Operator *> &plan, const string& filename, int 
 	float action_cost =  plan[i]->get_cost();
 	if(g_use_metric)
 	    action_cost = action_cost - 1;
-	cout << "Coste del paso: " << action_cost << endl;// Note: action costs have all been increased by 1 to deal with 0-cost actions
+	// Note: action costs have all been increased by 1 to deal with 0-cost actions
 	plan_cost += action_cost;
 	if(!g_use_metric)
 	    cout << plan[i]->get_name() << endl;

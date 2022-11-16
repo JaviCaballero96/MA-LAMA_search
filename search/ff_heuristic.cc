@@ -202,8 +202,10 @@ void FFHeuristic::setup_exploration_queue(const State &state,
 
     // Deal with current state.
     for(int var = 0; var < propositions.size(); var++) {
-	Proposition *init_prop = &propositions[var][state[var]];
-	enqueue_if_necessary(init_prop, 0, 0, 0, use_h_max);
+    if (state[var] != -1){
+    	Proposition *init_prop = &propositions[var][state[var]];
+    	enqueue_if_necessary(init_prop, 0, 0, 0, use_h_max);
+    }
     }
 
     // Initialize operator data, deal with precondition-free operators/axioms.
@@ -314,7 +316,7 @@ int FFHeuristic::compute_hsp_add_heuristic() {
     return total_cost;
 }
 
-int FFHeuristic::compute_hsp_max_heuristic() {
+float FFHeuristic::compute_hsp_max_heuristic() {
 /* Note: this function is currently not used */
     int maximal_cost = 0;
     for(int i = 0; i < goal_propositions.size(); i++) {
@@ -323,13 +325,13 @@ int FFHeuristic::compute_hsp_max_heuristic() {
 	    return DEAD_END;
 	maximal_cost = max(maximal_cost, prop_cost);
     }
-    return maximal_cost;
+    return float(maximal_cost);
 }
 
-int FFHeuristic::get_lower_bound(const State &state) {
+float FFHeuristic::get_lower_bound(const State &state) {
 /* Note: this function is currently not used */
     prepare_heuristic_computation(state, true);
-    int h = compute_hsp_max_heuristic();
+    float h = compute_hsp_max_heuristic();
     heuristic_recomputation_needed = true;
     return h;
 }

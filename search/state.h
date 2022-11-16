@@ -43,7 +43,7 @@ class State {
     hash_set<const LandmarkNode *, hash_pointer> reached_lms;
     int reached_lms_cost;
 
-    int g_value; // min. cost of reaching this state from the initial state
+    float g_value; // min. cost of reaching this state from the initial state
     void set_landmarks_for_initial_state();
     void update_reached_lms(const Operator &op);
     bool landmark_is_leaf(const LandmarkNode& node, 
@@ -51,6 +51,7 @@ class State {
     bool check_lost_landmark_children_needed_again(const LandmarkNode& node) const;
     
 public:
+    vector<float> numerc_vars_val;
     State(istream &in);
     State(const State &predecessor, const Operator &op);
     int &operator[](int index) {
@@ -62,7 +63,7 @@ public:
     void dump() const;
     bool operator<(const State &other) const;
 
-    int get_g_value() const {return g_value;}
+    float get_g_value() const {return g_value;}
     void change_ancestor(const State &new_predecessor, const Operator &new_op);
 
     int check_partial_plan(hash_set<const LandmarkNode*, hash_pointer>& reached) const;
