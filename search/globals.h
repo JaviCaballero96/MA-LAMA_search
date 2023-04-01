@@ -61,9 +61,11 @@ extern vector<string> g_variable_name;
 extern vector<int> g_variable_domain;
 extern vector<int> g_axiom_layers;
 extern vector<int> g_default_axiom_values;
+extern string total_time_var;
 
 extern State *g_initial_state;
 extern vector<pair<int, int> > g_goal;
+extern vector<pair<string, int> > g_shared_vars;
 extern vector<Operator> g_operators;
 extern vector<Operator> g_axioms;
 extern AxiomEvaluator *g_axiom_evaluator;

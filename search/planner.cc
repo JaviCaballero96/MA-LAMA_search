@@ -38,6 +38,8 @@
 #include <vector>
 #include <sys/times.h>
 #include <climits>
+#include <string>
+#include <cstring>
 
 using namespace std;
 
@@ -237,18 +239,106 @@ float save_plan(const vector<const Operator *> &plan, const string& filename, in
 	outfile.open(filename.c_str(), ios::out);
     }
     for(int i = 0; i < plan.size(); i++) {
-	float action_cost =  plan[i]->get_cost();
-	if(g_use_metric)
-	    action_cost = action_cost - 1;
-	// Note: action costs have all been increased by 1 to deal with 0-cost actions
-	plan_cost += action_cost;
-	if(!g_use_metric)
-	    cout << plan[i]->get_name() << endl;
-	else 
-	    cout << plan[i]->get_name() << " (" 
-		 << action_cost << ")" << endl;
-	outfile << "(" << plan[i]->get_name() << ")" << endl;
+		float action_cost =  plan[i]->get_cost();
+		if(g_use_metric)
+			action_cost = action_cost - 1;
+		// Note: action costs have all been increased by 1 to deal with 0-cost actions
+		plan_cost += action_cost;
+
+		float duration = 0;
+		std::vector<PrePost>::const_iterator it = plan[i]->get_pre_post().begin();
+		for(; it != plan[i]->get_pre_post().end(); it++) {
+			PrePost pp = *it;
+			if(g_variable_name[pp.var] == total_time_var) {
+				duration = pp.f_cost;
+				break;
+			}
+		}
+
+		if(!g_use_metric)
+			cout << duration << " " << plan[i]->get_name() << endl;
+		else
+			cout << duration << " " << plan[i]->get_name() << " ("
+			 << action_cost << ")" << endl;
+
+		/* Check if sharerd vars have been modified */
+		string shared_str = "(";
+		const std::vector<Prevail> prevail = plan[i]->get_prevail();
+		const std::vector<PrePost> prepost = plan[i]->get_pre_post();
+
+		/* Check constraints as prevail */
+		for(int j = 0; j < prevail.size(); j++)
+		{
+		    int var = prevail[j].var;
+		    int prev = prevail[j].prev;
+		    cout << "prevail: " << var << " " << prev << endl;
+
+		    for(int z = 0; z < g_shared_vars.size(); z++)
+		    {
+		    	int shared_number_1 = atoi((g_shared_vars[z].first.substr(3, g_shared_vars[z].first.length())).c_str());
+		    	int shared_number_2 = g_shared_vars[z].second;
+
+		    	if(shared_number_2 == var)
+		    	{
+		    		stringstream ss1, ss2;
+		    		string aux1, aux2;
+		    		ss1.str("");
+		    		ss1 << shared_number_1;
+		    		ss1 >> aux1;
+		    		ss2.str("");
+		    		ss2 << prev;
+		    		ss2 >> aux2;
+		    		shared_str = shared_str + "0 " + aux1 + " " + aux2 + " | ";
+		    	}
+		    }
+		}
+
+		/* Check constraints as prepost */
+		for(int j = 0; j < prepost.size(); j++)
+		{
+		    int var = prepost[j].var;
+		    int pre = prepost[j].pre;
+		    int post = prepost[j].post;
+		    cout << "prepost: " << var << " " << pre << " " << post << endl;
+
+		    if(pre == -2 || pre == -3 || pre == -4) continue;
+
+		    for(int z = 0; z < g_shared_vars.size(); z++)
+		    {
+		    	int shared_number_1 = atoi((g_shared_vars[z].first.substr(3, g_shared_vars[z].first.length())).c_str());
+		    	int shared_number_2 = g_shared_vars[z].second;
+
+		    	if(shared_number_2 == var)
+		    	{
+		    		stringstream ss1, ss2, ss3;
+		    		string aux1, aux2, aux3;
+		    		ss1.str("");
+		    		ss1 << shared_number_1;
+		    		ss1 >> aux1;
+		    		ss2.str("");
+		    		ss2 << pre;
+		    		ss2 >> aux2;
+		    		ss3.str("");
+		    		ss3 << post;
+		    		ss3 >> aux3;
+		    		shared_str = shared_str + "1 " + aux1 + " " + aux2 + " " + aux3 + " | ";
+		    	}
+
+		    }
+		}
+
+		if(shared_str == "(")
+		{
+			outfile << duration << " " << "(" << plan[i]->get_name() << ") " << action_cost << " no_constraints" << endl;
+		}else
+		{
+			shared_str = shared_str.substr(0, shared_str.size() - 3);
+			shared_str = shared_str + ")";
+			outfile << duration << " " << "(" << plan[i]->get_name() << ") " << action_cost << " " << shared_str << endl;
+		}
+
     }
+    outfile << "Cost: " <<  plan_cost << endl;
     outfile.close();
     if(!g_use_metric)
 	cout << "Plan length: " << plan.size() << " step(s)." << endl;

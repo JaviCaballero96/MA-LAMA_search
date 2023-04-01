@@ -79,8 +79,25 @@ void read_variables(istream &in) {
         int layer;
         in >> layer;
         g_axiom_layers.push_back(layer);
+        int isTotalTime;
+        in >> isTotalTime;
+        if(isTotalTime)
+        	total_time_var = name;
     }
     check_magic(in, "end_variables");
+}
+
+void read_shared(istream &in) {
+    check_magic(in, "begin_shared");
+    int count;
+    in >> count;
+    for(int i = 0; i < count; i++) {
+        int var;
+        string name;
+        in >> name >> var;
+        g_shared_vars.push_back(make_pair(name, var));
+    }
+    check_magic(in, "end_shared");
 }
 
 void read_goal(istream &in) {
@@ -137,6 +154,7 @@ void read_everything(istream &in, bool generate_landmarks, bool reasonable_order
     read_metric(in);
     read_variables(in);
     g_initial_state = new State(in);
+    read_shared(in);
     read_goal(in);
     read_operators(in);
     read_axioms(in);
@@ -173,9 +191,11 @@ vector <int> g_n_metric;
 vector<string> g_variable_name;
 vector<int> g_variable_domain;
 vector<int> g_axiom_layers;
+string total_time_var;
 vector<int> g_default_axiom_values;
 State *g_initial_state;
 vector<pair<int, int> > g_goal;
+vector<pair<string, int> > g_shared_vars;
 vector<Operator> g_operators;
 vector<Operator> g_axioms;
 AxiomEvaluator *g_axiom_evaluator;
