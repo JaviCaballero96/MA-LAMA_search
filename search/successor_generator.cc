@@ -77,10 +77,14 @@ void SuccessorGeneratorSwitch::check_functional_validity(
 		vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
 		for(; it_pp != op->get_pre_post().end(); ++it_pp) {
 			PrePost pp = *it_pp;
-			if(pp.pre == -3)
+			if(pp.pre == -5)
 			{
-				float f_result = curr.numerc_vars_val[pp.var] - pp.f_cost;
-				if (f_result < 0) {
+				if (curr.numerc_vars_val[pp.var] < pp.f_cost) {
+					op_valid = false;
+					break;
+				}
+			}else if(pp.pre == -6) {
+				if (curr.numerc_vars_val[pp.var] > pp.f_cost) {
 					op_valid = false;
 					break;
 				}

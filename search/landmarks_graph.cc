@@ -208,7 +208,9 @@ void LandmarksGraph::read_external_inconsistencies() {
                 in >> predicate;
                 if ((predicate == "Decrease") ||
                 		(predicate == "Increase") ||
-						(predicate == "Assign")) {
+						(predicate == "Assign") ||
+						(predicate == "GreaterThan") ||
+						(predicate == "LessThan")) {
                 	in >> aux;
                 	while (aux != ">") {
                 		predicate = predicate + " " + aux;
@@ -336,7 +338,8 @@ void LandmarksGraph::generate_operators_lookups() {
         bool no_pre = true;
         for (unsigned j = 0; j < prepost.size(); j++) {
             if((prepost[j].pre != -1) && (prepost[j].pre != -2) &&
-            		(prepost[j].pre != -3) && (prepost[j].pre != -4)) {
+            		(prepost[j].pre != -3) && (prepost[j].pre != -4)
+					&& (prepost[j].pre != -5)  && (prepost[j].pre != -6)) {
                 no_pre = false;
                 operators_pre_lookup[prepost[j].var][prepost[j].pre].push_back(i);
             }

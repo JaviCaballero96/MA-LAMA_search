@@ -407,7 +407,7 @@ void LandmarksGraphNew::generate_landmarks() {
 	    compute_shared_preconditions(shared_pre, lvl_var, bp);
 	    // All such shared preconditions are landmarks, and greedy necessary predecessors of bp.
             for(hash_map<int, int>::iterator it = shared_pre.begin(); it != shared_pre.end(); it++){
-            	if ((it->second != -2) && (it->second != -3) && (it->second != -4))
+            	if ((it->second != -2) && (it->second != -3) && (it->second != -4)  && (it->second != -5)  && (it->second != -6))
                 	found_lm_and_order(*it, *bp, gn);
             }
             // Extract additional orders from relaxed planning graph and DTG.

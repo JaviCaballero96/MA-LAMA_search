@@ -139,6 +139,10 @@ State::State(const State &predecessor, const Operator &op)
 				vars[pre_post.var] = pre_post.post;
 				break;
 
+			case -5:
+			case -6:
+				break;
+
 			default:
 				vars[pre_post.var] = pre_post.post;
 			}

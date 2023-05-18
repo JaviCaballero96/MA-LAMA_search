@@ -121,7 +121,7 @@ void FFHeuristic::build_unary_operators(const Operator &op) {
 	precondition_var_vals1.push_back(make_pair(prevail[i].var, prevail[i].prev));
     }
     for(int i = 0; i < pre_post.size(); i++)
-	if((pre_post[i].pre != -1) && (pre_post[i].pre != -2) && (pre_post[i].pre != -3) && (pre_post[i].pre != -4))  {
+	if((pre_post[i].pre != -1) && (pre_post[i].pre != -2) && (pre_post[i].pre != -3) && (pre_post[i].pre != -4) && (pre_post[i].pre != -5) && (pre_post[i].pre != -6))  {
 	    assert(pre_post[i].var >= 0 && pre_post[i].var < g_variable_domain.size());
 	    assert(pre_post[i].pre >= 0 && pre_post[i].pre < g_variable_domain[pre_post[i].var]);
 	    // precondition.push_back(&propositions[pre_post[i].var][pre_post[i].pre]);
@@ -141,6 +141,14 @@ void FFHeuristic::build_unary_operators(const Operator &op) {
         }
         if(pre_post[i].pre == -4){
         	(propositions[pre_post[i].var][pre_post[i].post]).func_op = ASSIGN;
+        	(propositions[pre_post[i].var][pre_post[i].post]).func_val = pre_post[i].f_cost;
+     	}
+        if(pre_post[i].pre == -5){
+        	(propositions[pre_post[i].var][pre_post[i].post]).func_op = GREAT_THAN;
+        	(propositions[pre_post[i].var][pre_post[i].post]).func_val = pre_post[i].f_cost;
+     	}
+        if(pre_post[i].pre == -6){
+        	(propositions[pre_post[i].var][pre_post[i].post]).func_op = LESS_THAN;
         	(propositions[pre_post[i].var][pre_post[i].post]).func_val = pre_post[i].f_cost;
      	}
 		Proposition *effect = &propositions[pre_post[i].var][pre_post[i].post];

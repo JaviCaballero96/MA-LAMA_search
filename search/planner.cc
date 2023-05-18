@@ -301,7 +301,7 @@ float save_plan(const vector<const Operator *> &plan, const string& filename, in
 		    int post = prepost[j].post;
 		    cout << "prepost: " << var << " " << pre << " " << post << endl;
 
-		    if(pre == -2 || pre == -3 || pre == -4) continue;
+		    if(pre == -2 || pre == -3 || pre == -4 || pre == 5 || pre == -6) continue;
 
 		    for(int z = 0; z < g_shared_vars.size(); z++)
 		    {

@@ -44,7 +44,9 @@ enum func_operations {
     NO_OPP = 0,
     INCREASE = 1,
     DECREASE = 2,
-    ASSIGN = 3
+    ASSIGN = 3,
+	GREAT_THAN = 4,
+	LESS_THAN = 5
 };
 
 struct Proposition {
