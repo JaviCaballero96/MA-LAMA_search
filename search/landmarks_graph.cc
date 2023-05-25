@@ -174,7 +174,7 @@ void LandmarksGraph::read_external_inconsistencies() {
    is true at any point in time. Hence, all facts within a group are mutually exclusive.
  */
     cout << "Reading invariants from file..." << endl;
-    ifstream myfile ("/home/javier/Desktop/planners/outPreprocess/all.groups");
+    ifstream myfile ("all.groups");
     if(myfile.is_open()) {
         ifstream &in = myfile;
         check_magic(in, "begin_groups");
