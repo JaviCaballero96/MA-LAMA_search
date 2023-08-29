@@ -299,7 +299,7 @@ float save_plan(const vector<const Operator *> &plan, const string& filename, in
 		    int var = prepost[j].var;
 		    int pre = prepost[j].pre;
 		    int post = prepost[j].post;
-		    cout << "prepost: " << var << " " << pre << " " << post << endl;
+		    //cout << "prepost: " << var << " " << pre << " " << post << endl;
 
 		    if(pre == -2 || pre == -3 || pre == -4 || pre == 5 || pre == -6) continue;
 

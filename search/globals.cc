@@ -55,7 +55,8 @@ void read_metric(istream &in) {
   check_magic(in, "begin_metric");
   g_use_metric = true;
   in >> g_op_metric;
-  while(true)
+
+  while(g_op_metric != "end")
   {
 	  in >> metric_aux;
 	  if (metric_aux == "end")
