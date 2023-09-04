@@ -271,7 +271,7 @@ float save_plan(const vector<const Operator *> &plan, const string& filename, in
 		{
 		    int var = prevail[j].var;
 		    int prev = prevail[j].prev;
-		    cout << "prevail: " << var << " " << prev << endl;
+		    //cout << "prevail: " << var << " " << prev << endl;
 
 		    for(int z = 0; z < g_shared_vars.size(); z++)
 		    {

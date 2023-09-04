@@ -30,6 +30,8 @@
 #include <fstream>
 #include <sstream>
 #include <climits>
+#include <unistd.h>
+#define GetCurrentDir getcwd
 
 #include "landmarks_graph.h"
 #include "operator.h"
@@ -261,7 +263,10 @@ void LandmarksGraph::read_external_inconsistencies() {
         cout << "done" << endl;
     }
     else {
-        cout << "Unable to open invariants file!" << endl; 
+    	char buff[200]; //create string buffer to hold path
+    	GetCurrentDir( buff, 200 );
+    	string current_working_dir(buff);
+        cout << "Unable to open invariants file! in " << current_working_dir << "/all.groups" << endl;
         exit(1);
     }
 }
