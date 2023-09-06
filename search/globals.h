@@ -55,6 +55,7 @@ struct hash_operator_ptr {
 };
 
 extern bool g_use_metric;
+extern bool g_length_metric;
 extern string g_op_metric;
 extern vector<int> g_n_metric;
 extern vector<string> g_variable_name;

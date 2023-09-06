@@ -109,9 +109,12 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     reached_lms = new_predecessor.reached_lms; // Can this be a problem?
     reached_lms_cost = new_predecessor.reached_lms_cost;
     update_reached_lms(new_op);
-    g_value = new_predecessor.get_g_value() + new_op.get_cost();
+    if(g_length_metric)
+    	g_value = new_predecessor.get_g_value() + 2;
+    else
+    	g_value = new_predecessor.get_g_value() + new_op.get_cost();
     if (g_use_metric) // if using action costs, all costs have been increased by 1
-	g_value = g_value - 1;
+		g_value = g_value - 1;
 }
 
 State::State(const State &predecessor, const Operator &op)
@@ -152,9 +155,12 @@ State::State(const State &predecessor, const Operator &op)
     // Update set of reached landmarks.
     update_reached_lms(op);
     // Update g_value
-    g_value = predecessor.get_g_value() + op.get_cost();
+    if(g_length_metric)
+    	g_value = predecessor.get_g_value() + 2;
+    else
+    	g_value = predecessor.get_g_value() + op.get_cost();
     if (g_use_metric) // if using action costs, all costs have been increased by 1
-	g_value = g_value - 1;
+    	g_value = g_value - 1;
 }
 
 void State::dump() const {

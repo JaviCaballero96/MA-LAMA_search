@@ -54,7 +54,11 @@ void read_metric(istream &in) {
 
   check_magic(in, "begin_metric");
   g_use_metric = true;
+  g_length_metric = false;
   in >> g_op_metric;
+
+  if (g_op_metric == "end")
+	  g_length_metric = true;
 
   while(g_op_metric != "end")
   {
@@ -187,6 +191,7 @@ void dump_everything() {
 }
 
 bool g_use_metric;
+bool g_length_metric;
 string g_op_metric;
 vector <int> g_n_metric;
 vector<string> g_variable_name;

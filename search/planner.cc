@@ -240,9 +240,10 @@ float save_plan(const vector<const Operator *> &plan, const string& filename, in
     }
     for(int i = 0; i < plan.size(); i++) {
 		float action_cost =  plan[i]->get_cost();
-		if(g_use_metric)
+		if(g_use_metric && !g_length_metric)
 			action_cost = action_cost - 1;
 		// Note: action costs have all been increased by 1 to deal with 0-cost actions
+
 		plan_cost += action_cost;
 
 		float duration = 0;
