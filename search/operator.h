@@ -53,6 +53,9 @@ struct PrePost {
     int var;
     int pre, post;
     float f_cost;
+    bool have_runtime_cost_effect;
+    string runtime_cost_effect;
+    bool is_conditional_effect;
     std::vector<Prevail> cond;
     PrePost() {} // Needed for axiom file-reading constructor, unfortunately.
     PrePost(std::istream &in);
@@ -82,6 +85,8 @@ class Operator {
     std::vector<PrePost> pre_post;     // var, old-val, new-val, effect conditions
     std::string name;
     float cost;
+    bool have_runtime_cost;
+    string runtime_cost;
 public:
     Operator(std::istream &in, bool is_axiom);
     void dump() const;

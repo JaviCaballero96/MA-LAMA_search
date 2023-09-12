@@ -25,6 +25,7 @@
 #include "operator.h"
 
 #include <iostream>
+#include <sstream>
 using namespace std;
 
 Prevail::Prevail(istream &in) {
@@ -34,12 +35,28 @@ Prevail::Prevail(istream &in) {
 PrePost::PrePost(istream &in) {
 	/* effects */
     int condCount;
+    string s_aux = "";
     in >> condCount;
     for(int i = 0; i < condCount; i++)
         cond.push_back(Prevail(in));
     in >> var >> pre >> post;
     if ((pre == -2) || (pre == -3) || (pre == -4)  || (pre == -5)  || (pre == -6))
-    	in >> f_cost;
+    {
+    	in >> s_aux;
+    	if (s_aux.find('(') == std::string::npos)
+    	{
+            istringstream buffer(s_aux);
+            buffer >> f_cost;
+            have_runtime_cost_effect = false;
+            runtime_cost_effect = "";
+    	}else
+    	{
+    		f_cost = 0;
+    		have_runtime_cost_effect = true;
+    		runtime_cost_effect = s_aux;
+    	}
+    }
+
 }
 
 Operator::Operator(istream &in, bool axiom) {
@@ -63,6 +80,20 @@ Operator::Operator(istream &in, bool axiom) {
 	//TODO float +1 no se pa que es esto
 	// cost = op_cost;
 	cost = g_use_metric ? op_cost + 1 : 1;
+
+	string s_aux = "";
+	in >> s_aux;
+	if(s_aux == "runtime")
+	{
+		have_runtime_cost = true;
+		in >> runtime_cost;
+	}else
+	{
+		have_runtime_cost = false;
+		runtime_cost = "";
+		in >> s_aux;
+	}
+
 
     check_magic(in, "end_operator");
     } else {
