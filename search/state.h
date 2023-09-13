@@ -68,6 +68,8 @@ public:
 
     int check_partial_plan(hash_set<const LandmarkNode*, hash_pointer>& reached) const;
     int get_needed_landmarks(hash_set<const LandmarkNode*, hash_pointer>& needed) const;
+    template <typename T>
+    T calculate_runtime_efect(string s_effect);
 };
 
 #endif

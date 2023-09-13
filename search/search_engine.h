@@ -32,6 +32,7 @@ public:
 private:
     bool solved;
     Plan plan;
+    float plan_cost;
 protected:
     enum {FAILED, SOLVED, IN_PROGRESS};
     virtual void initialize() {}
@@ -45,6 +46,8 @@ public:
     bool found_solution() const;
     const Plan &get_plan() const;
     void search();
+    float get_plan_cost(){return plan_cost;};
+    void set_plan_cost(float cost){plan_cost = cost;};
 };
 
 #endif

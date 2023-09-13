@@ -106,7 +106,10 @@ public:
 		return false;
 	return true;
     }
-    float get_cost() const {return cost;}
+    bool get_have_runtime_cost() const {return have_runtime_cost;};
+    string get_runtime_cost() const {return runtime_cost;};
+    float get_cost() const {return cost;};
+
 };
 
 #endif

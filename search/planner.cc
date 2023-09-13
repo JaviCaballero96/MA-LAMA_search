@@ -44,7 +44,7 @@
 using namespace std;
 
 
-float save_plan(const vector<const Operator *> &plan, const string& filename, int iteration);
+float save_plan(const vector<const Operator *> &plan, const float cost,const string& filename, int iteration);
 
 void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators, 
 			   bool landmarks_heuristic, 
@@ -190,7 +190,7 @@ int main(int argc, const char **argv) {
 	times(&search_end);
 	float plan_cost = FLT_MAX;
 	if(engine->found_solution())
-	    plan_cost = save_plan(engine->get_plan(), plan_filename, iteration_no);
+	    plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no);
 
 	engine->statistics();
 
@@ -205,7 +205,7 @@ int main(int argc, const char **argv) {
 
 	// Set new parameters for next search
 	search_type = wa_star;
-	wastar_bound = plan_cost - 0.1;
+	wastar_bound = plan_cost - 0.01;
 	if(wastar_weight <= 2) { // make search less greedy
 	    ff_preferred_operators = false;
 	    landmarks_preferred_operators = false;
@@ -224,7 +224,7 @@ int main(int argc, const char **argv) {
     return solution_found ? 0 : 1; 
 }
 
-float save_plan(const vector<const Operator *> &plan, const string& filename, int iteration) {
+float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename, int iteration) {
     ofstream outfile;
     float plan_cost = 0;
     bool separate_outfiles = true; // IPC conditions, change to false for a single outfile.
@@ -339,14 +339,14 @@ float save_plan(const vector<const Operator *> &plan, const string& filename, in
 		}
 
     }
-    outfile << "Cost: " <<  plan_cost << endl;
+    outfile << "Cost: " <<  cost << endl;
     outfile.close();
     if(!g_use_metric)
 	cout << "Plan length: " << plan.size() << " step(s)." << endl;
     else 
 	cout << "Plan length: " << plan.size() << " step(s), cost: " 
-	     << plan_cost << "." << endl;
-    return plan_cost;
+	     << cost << "." << endl;
+    return cost;
 }
 
 void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators, 

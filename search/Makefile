@@ -5,9 +5,9 @@ HEADERS = heuristic.h ff_heuristic.h wa_star_search.h \
 	  search_engine.h open_list.h closed_list.h \
 	  landmarks_graph.h \
 	  landmarks_graph_rpg_sasp.h \
-	  landmarks_count_heuristic.h \
+	  landmarks_count_heuristic.h 
 
-SOURCES = planner.cc $(HEADERS:%.h=%.cc)
+SOURCES = planner.cc $(HEADERS:%.h=%.cc) exprtk.cc
 OBJECTS = $(SOURCES:%.cc=%.o)
 PROFILE_OBJECTS = $(SOURCES:%.cc=%.profile.o)
 RELEASE_OBJECTS = $(SOURCES:%.cc=%.release.o)

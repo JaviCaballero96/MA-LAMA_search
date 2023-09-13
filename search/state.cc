@@ -30,10 +30,13 @@
 #include "landmarks_graph.h"
 #include "float.h"
 #include "ff_heuristic.h"
+#include "exprtk.cc"
 
 #include <algorithm>
 #include <iostream>
 #include <cassert>
+#include<sstream>
+#include <algorithm>
 using namespace std;
 
 State::State(istream &in) {
@@ -129,17 +132,32 @@ State::State(const State &predecessor, const Operator &op)
 			switch(pre_post.pre){
 			case -2:
 				vars[pre_post.var] = pre_post.post;
-				numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] + pre_post.f_cost;
+				if (!pre_post.have_runtime_cost_effect)
+					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] + pre_post.f_cost;
+				else{
+					float cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] + cal_cost;
+				}
 				break;
 
 			case -3:
-				numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] - pre_post.f_cost;
 				vars[pre_post.var] = pre_post.post;
+				if (!pre_post.have_runtime_cost_effect)
+					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] - pre_post.f_cost;
+				else{
+					float cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] - cal_cost;
+				}
 				break;
 
 			case -4:
-				numerc_vars_val[pre_post.var] = pre_post.f_cost;
 				vars[pre_post.var] = pre_post.post;
+				if (!pre_post.have_runtime_cost_effect)
+					numerc_vars_val[pre_post.var] = pre_post.f_cost;
+				else{
+					float cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+					numerc_vars_val[pre_post.var] = cal_cost;
+				}
 				break;
 
 			case -5:
@@ -157,8 +175,13 @@ State::State(const State &predecessor, const Operator &op)
     // Update g_value
     if(g_length_metric)
     	g_value = predecessor.get_g_value() + 2;
-    else
-    	g_value = predecessor.get_g_value() + op.get_cost();
+    else {
+    	if (!op.get_have_runtime_cost())
+        	g_value = predecessor.get_g_value() + op.get_cost();
+    	else {
+    		g_value = predecessor.get_g_value() + this->calculate_runtime_efect<float>(op.get_runtime_cost()) + 1;
+    	}
+    }
     if (g_use_metric) // if using action costs, all costs have been increased by 1
     	g_value = g_value - 1;
 }
@@ -282,4 +305,46 @@ int State::check_partial_plan(hash_set<const LandmarkNode*, hash_pointer>& reach
     // Return reached landmarks and their cost
     reached = reached_lms;
     return reached_lms_cost;
+}
+
+template <typename T>
+T State::calculate_runtime_efect(string s_effect){
+
+	// First get current value of runtime numerical variables
+	string s_eff_aux = s_effect;
+	while(s_effect.find(":") != string::npos){
+		string var = "";
+		int i_var;
+		float var_value;
+		s_eff_aux = s_eff_aux.substr(s_eff_aux.find(":") + 1, s_eff_aux.length() - 1);
+		var = s_eff_aux.substr(0, s_eff_aux.find(":"));
+		s_eff_aux = s_eff_aux.substr(s_eff_aux.find(":") + 1, s_eff_aux.length() - 1);
+		stringstream strm(var);
+		strm >> i_var;
+		var_value = numerc_vars_val[i_var];
+   		std::ostringstream strm_var;
+   		strm_var << var_value;
+
+		string from = ":" + var + ":";
+		string to = strm_var.str();
+	    size_t start_pos = 0;
+	    while((start_pos = s_effect.find(from, start_pos)) != std::string::npos) {
+	    	s_effect.replace(start_pos, from.length(), to);
+	        start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
+	    }
+	}
+
+    // now solve the operation
+	typedef exprtk::symbol_table<T> symbol_table_t;
+	typedef exprtk::expression<T>   expression_t;
+	typedef exprtk::parser<T>       parser_t;
+	T result = 0;
+	symbol_table_t symbol_table;
+	symbol_table.add_constants();
+	expression_t expression;
+	expression.register_symbol_table(symbol_table);
+	parser_t parser;
+	parser.compile(s_effect,expression);
+	result = expression.value();
+	return result;
 }

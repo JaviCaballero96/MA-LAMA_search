@@ -147,6 +147,7 @@ bool BestFirstSearchEngine::check_goal() {
 	cout << "Solution found!" << endl;
 	Plan plan;
 	closed_list.trace_path(current_state, plan);
+	set_plan_cost(current_state.get_g_value());
 	set_plan(plan);
 	return true;
     } else {
