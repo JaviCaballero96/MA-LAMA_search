@@ -33,6 +33,8 @@ private:
     bool solved;
     Plan plan;
     float plan_cost;
+    vector<float> plan_tamporal_info;
+    vector<float> plan_cost_info;
 protected:
     enum {FAILED, SOLVED, IN_PROGRESS};
     virtual void initialize() {}
@@ -48,6 +50,10 @@ public:
     void search();
     float get_plan_cost(){return plan_cost;};
     void set_plan_cost(float cost){plan_cost = cost;};
+    void set_plan_temporal_info(vector<float> plan_temp){plan_tamporal_info = plan_temp;};
+    vector<float>  get_plan_temporal_info(){return plan_tamporal_info;};
+    void set_plan_cost_info(vector<float> plan_temp){plan_cost_info = plan_temp;};
+    vector<float>  get_plan_cost_info(){return plan_cost_info;};
 };
 
 #endif

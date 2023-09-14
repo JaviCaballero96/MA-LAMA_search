@@ -130,16 +130,24 @@ State::State(const State &predecessor, const Operator &op)
 		const PrePost &pre_post = op.get_pre_post()[i];
 		if(pre_post.does_fire(predecessor)){
 			switch(pre_post.pre){
-			case -2:
+			case -2:{
 				vars[pre_post.var] = pre_post.post;
-				if (!pre_post.have_runtime_cost_effect)
+				float cal_cost = 0;
+				if (!pre_post.have_runtime_cost_effect){
 					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] + pre_post.f_cost;
+				    cal_cost = pre_post.f_cost;
+				}
 				else{
-					float cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+					cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
 					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] + cal_cost;
 				}
-				break;
 
+				if (g_variable_name[pre_post.var] == total_time_var){
+					g_time_value = cal_cost;
+				}
+
+				break;
+			}
 			case -3:
 				vars[pre_post.var] = pre_post.post;
 				if (!pre_post.have_runtime_cost_effect)

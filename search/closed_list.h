@@ -27,6 +27,8 @@
 #include <map>
 #include <vector>
 
+using namespace std;
+
 template<class Entry, class Annotation>
 class ClosedList {
     struct PredecessorInfo {
@@ -52,7 +54,7 @@ public:
 			const Entry *predecessor, 
 			const Annotation &annotation);
     int size() const;
-    void trace_path(const Entry &entry, std::vector<Annotation> &path) const;
+    vector<Entry> trace_path(const Entry &entry, std::vector<Annotation> &path) const;
 };
 
 #include "closed_list.cc" // HACK! Templates and the current Makefile don't mix well

@@ -44,7 +44,7 @@
 using namespace std;
 
 
-float save_plan(const vector<const Operator *> &plan, const float cost,const string& filename, int iteration);
+float save_plan(const vector<const Operator *> &plan, const float cost,const string& filename, int iteration, vector<float> plan_temporal_info, vector<float> plan_cost_info);
 
 void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators, 
 			   bool landmarks_heuristic, 
@@ -190,7 +190,7 @@ int main(int argc, const char **argv) {
 	times(&search_end);
 	float plan_cost = FLT_MAX;
 	if(engine->found_solution())
-	    plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no);
+	    plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no, engine->get_plan_temporal_info(), engine->get_plan_cost_info());
 
 	engine->statistics();
 
@@ -224,7 +224,7 @@ int main(int argc, const char **argv) {
     return solution_found ? 0 : 1; 
 }
 
-float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename, int iteration) {
+float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename, int iteration, vector<float> plan_temporal_info, vector<float> plan_cost_info) {
     ofstream outfile;
     float plan_cost = 0;
     bool separate_outfiles = true; // IPC conditions, change to false for a single outfile.
@@ -239,22 +239,15 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 	outfile.open(filename.c_str(), ios::out);
     }
     for(int i = 0; i < plan.size(); i++) {
-		float action_cost =  plan[i]->get_cost();
-		if(g_use_metric && !g_length_metric)
-			action_cost = action_cost - 1;
+		float action_cost =  plan_cost_info[i];
+		if (i != 0){
+			action_cost = action_cost - plan_cost_info[i - 1];
+		}
 		// Note: action costs have all been increased by 1 to deal with 0-cost actions
 
 		plan_cost += action_cost;
 
-		float duration = 0;
-		std::vector<PrePost>::const_iterator it = plan[i]->get_pre_post().begin();
-		for(; it != plan[i]->get_pre_post().end(); it++) {
-			PrePost pp = *it;
-			if(g_variable_name[pp.var] == total_time_var) {
-				duration = pp.f_cost;
-				break;
-			}
-		}
+		float duration = plan_temporal_info[i];
 
 		if(!g_use_metric)
 			cout << duration << " " << plan[i]->get_name() << endl;

@@ -44,6 +44,7 @@ class State {
     int reached_lms_cost;
 
     float g_value; // min. cost of reaching this state from the initial state
+    float g_time_value;
     void set_landmarks_for_initial_state();
     void update_reached_lms(const Operator &op);
     bool landmark_is_leaf(const LandmarkNode& node, 
@@ -64,6 +65,7 @@ public:
     bool operator<(const State &other) const;
 
     float get_g_value() const {return g_value;}
+    float get_g_time_value() const {return g_time_value;}
     void change_ancestor(const State &new_predecessor, const Operator &new_op);
 
     int check_partial_plan(hash_set<const LandmarkNode*, hash_pointer>& reached) const;

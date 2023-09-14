@@ -146,8 +146,20 @@ bool BestFirstSearchEngine::check_goal() {
 		    return false;
 	cout << "Solution found!" << endl;
 	Plan plan;
-	closed_list.trace_path(current_state, plan);
+	vector<State> states_plan = closed_list.trace_path(current_state, plan);
+	vector<float> plan_temporal_info;
+	for(int i = 1; i < states_plan.size(); i++)
+	{
+		plan_temporal_info.push_back(states_plan[i].get_g_time_value());
+	}
+	vector<float> plan_cost_info;
+	for(int i = 1; i < states_plan.size(); i++)
+	{
+		plan_cost_info.push_back(states_plan[i].get_g_value());
+	}
 	set_plan_cost(current_state.get_g_value());
+	set_plan_temporal_info(plan_temporal_info);
+	set_plan_cost_info(plan_cost_info);
 	set_plan(plan);
 	return true;
     } else {

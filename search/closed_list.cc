@@ -98,19 +98,25 @@ int ClosedList<Entry, Annotation>::size() const {
 }
 
 template<class Entry, class Annotation>
-void ClosedList<Entry, Annotation>::trace_path(
+vector<Entry> ClosedList<Entry, Annotation>::trace_path(
     const Entry &entry, vector<Annotation> &path) const {
     assert(path.empty());
+    vector<Entry> entry_vector;
     Entry current_entry = entry;
+    entry_vector.push_back(current_entry);
     for(;;) {
 	const PredecessorInfo &info = closed.find(current_entry)->second;
 	if(info.predecessor == 0)
 	    break;
 	path.push_back(info.annotation);
 	current_entry = *info.predecessor;
+	entry_vector.push_back(current_entry);
     }
 
     reverse(path.begin(), path.end());
+    reverse(entry_vector.begin(), entry_vector.end());
+
+    return entry_vector;
 }
 
 #endif
