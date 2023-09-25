@@ -126,6 +126,7 @@ void dump_goal() {
 
 void read_operators(istream &in) {
     int count;
+    is_temporal = true;
     in >> count;
     for(int i = 0; i < count; i++)
         g_operators.push_back(Operator(in, false));
@@ -152,7 +153,7 @@ void build_landmarks_graph(bool reasonable_orders) {
     cout << "Generated " << g_lgraph->number_of_landmarks() << " landmarks, of which "
 	 << g_lgraph->number_of_disj_landmarks() << " are disjunctive" << endl
 	 << "          " << g_lgraph->number_of_edges() << " edges\n";
-    //g_lgraph->dump();
+    g_lgraph->dump();
 }
 
 void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders) {

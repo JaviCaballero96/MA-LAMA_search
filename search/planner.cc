@@ -162,7 +162,7 @@ int main(int argc, const char **argv) {
 		// Parameters of WAStar are 1) weight for heuristic, 2) upper bound on solution
 		// cost (this cuts of search branches if the cost of a node exceeds the bound), 
 		// use -1 for none.
-	    engine = new WAStarSearchEngine(wastar_weight, wastar_bound);  
+	    engine = new WAStarSearchEngine(wastar_weight, wastar_bound);
 	else
 	    engine = new BestFirstSearchEngine;
 
@@ -205,8 +205,8 @@ int main(int argc, const char **argv) {
 
 	// Set new parameters for next search
 	search_type = wa_star;
-	wastar_bound = plan_cost - 0.01;
-	if(wastar_weight <= 2) { // make search less greedy
+	wastar_bound = plan_cost - 0.0001;
+	if(wastar_weight <= 10) { // make search less greedy
 	    ff_preferred_operators = false;
 	    landmarks_preferred_operators = false;
 	}
@@ -243,6 +243,7 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		if (i != 0){
 			action_cost = action_cost - plan_cost_info[i - 1];
 		}
+		//action_cost = action_cost - 1;
 		// Note: action costs have all been increased by 1 to deal with 0-cost actions
 
 		plan_cost += action_cost;
@@ -317,7 +318,6 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		    		ss3 >> aux3;
 		    		shared_str = shared_str + "1 " + aux1 + " " + aux2 + " " + aux3 + " | ";
 		    	}
-
 		    }
 		}
 
@@ -332,13 +332,13 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		}
 
     }
-    outfile << "Cost: " <<  cost << endl;
+    outfile << "Cost: " <<  plan_cost << endl;
     outfile.close();
     if(!g_use_metric)
 	cout << "Plan length: " << plan.size() << " step(s)." << endl;
     else 
 	cout << "Plan length: " << plan.size() << " step(s), cost: " 
-	     << cost << "." << endl;
+	     << plan_cost << "." << endl;
     return cost;
 }
 

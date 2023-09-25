@@ -48,10 +48,10 @@ State::State(istream &in) {
     	if (var == -1){
     		vars.push_back(var);
     		in >> var_val;
-    		numerc_vars_val.push_back(var_val);
+    		numeric_vars_val.push_back(var_val);
     	}else{
     		vars.push_back(var);
-    		numerc_vars_val.push_back(FLT_MAX);
+    		numeric_vars_val.push_back(FLT_MAX);
     	}
     }
     check_magic(in, "end_state");
@@ -72,17 +72,17 @@ void State::update_reached_lms(const Operator &op) {
 		g_lgraph->landmark_reached(make_pair(pre_post.var, pre_post.post));
 	    if(node_p != 0) {
 		if(reached_lms.find(node_p) == reached_lms.end()) {
-		    //cout << endl << "New LM reached! +++++++ ";
-		    //g_lgraph->dump_node(node_p);
+		    cout << endl << "New LM reached! +++++++ ";
+		    g_lgraph->dump_node(node_p);
 		    // Only add leaves of landmark graph to reached
 		    const LandmarkNode& node = *node_p;
 		    if(landmark_is_leaf(node, reached_lms)) { 
-			//cout << "inserting new LM into reached. (1)" << endl; 
+			cout << "inserting new LM into reached." << endl;
 			reached_lms.insert(node_p);
 			reached_lms_cost += node_p->min_cost;
 		    } 
-		    //else
-		    //cout << "not inserting into reached, has parents" << endl;
+		    else
+		    cout << "not inserting into reached, has parents" << endl;
 		}
 	    }
 	}
@@ -94,14 +94,14 @@ void State::update_reached_lms(const Operator &op) {
 	for(int i = 0; i < node->vars.size(); i++) {
 	    if((*this)[node->vars[i]] == node->vals[i]) {
 		if(reached_lms.find(node) == reached_lms.end()) {
-		    //cout << "New LM reached by axioms: "; g_lgraph->dump_node(node);
+		    cout << "New LM reached by axioms: "; g_lgraph->dump_node(node);
 		    if(landmark_is_leaf(*node, reached_lms)) { 
-			//cout << "inserting new LM into reached. (2)" << endl; 
+			cout << "inserting new LM into reached. (2)" << endl;
 			reached_lms.insert(node);  
 			reached_lms_cost += node->min_cost;
 		    } 
-		    //else
-			//cout << "not inserting into reached, has parents" << endl;
+		    else
+			cout << "not inserting into reached, has parents" << endl;
 		}
 	    }
 	}
@@ -121,12 +121,145 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 }
 
 State::State(const State &predecessor, const Operator &op)
-    : vars(predecessor.vars), numerc_vars_val(predecessor.numerc_vars_val),
+    : vars(predecessor.vars), numeric_vars_val(predecessor.numeric_vars_val),
 	  reached_lms(predecessor.reached_lms), reached_lms_cost(predecessor.reached_lms_cost) {
     assert(!op.is_axiom());
 
+	float op_duration = 0;
+    if(is_temporal){
+		// Get action duration
+		if(op.get_name().find("_start") != string::npos){
+			// Get the duration calculating the costfrom the current state
+			vector<PrePost>::const_iterator it_pp = op.get_pre_post().begin();
+			for(; it_pp != op.get_pre_post().end(); ++it_pp) {
+				PrePost pp = *it_pp;
+				if(g_variable_name[pp.var] == total_time_var)
+				{
+					if(pp.have_runtime_cost_effect)
+					{
+						op_duration = predecessor.calculate_runtime_efect<float>(pp.runtime_cost_effect);
+					} else{
+						op_duration = pp.f_cost;
+					}
+
+					break;
+				}
+			}
+		}else{
+			// Get the duration from the running action
+			vector<runn_action>::const_iterator it_ra_const = predecessor.running_actions.begin();
+			for(; (it_ra_const != predecessor.running_actions.end()) && (op_duration == 0); it_ra_const++){
+				if((*it_ra_const).non_temporal_action_name == op.get_non_temporal_action_name()){
+					vector<PrePost>::const_iterator it_fc = (*it_ra_const).functional_costs.begin();
+					for(; (it_fc != op.get_pre_post().end()) && (op_duration == 0); ++it_fc) {
+						PrePost pp = *it_fc;
+						if(g_variable_name[pp.var] == total_time_var)
+						{
+							op_duration = pp.f_cost;
+						}
+					}
+				}
+			}
+		}
+
+		vector<runn_action>::const_iterator it_ra_const = predecessor.running_actions.begin();
+		for(; it_ra_const != predecessor.running_actions.end(); it_ra_const++)
+		{
+			this->running_actions.push_back(*it_ra_const);
+		}
+
+		g_time_value = op_duration;
+		if(op.get_name().find("_start") != string::npos){
+			running_actions.push_back(*(new(runn_action)));
+			running_actions.back().non_temporal_action_name = op.get_non_temporal_action_name();
+			running_actions.back().time_start = predecessor.g_current_time_value;
+			running_actions.back().time_end = predecessor.g_current_time_value + op_duration;
+
+			for(int i = 0; i < op.get_pre_post().size(); i++) {
+				PrePost pre_post = op.get_pre_post()[i];
+
+				if((pre_post.pre == -2) || (pre_post.pre == -3) || (pre_post.pre == -4))
+				{
+					if(pre_post.have_runtime_cost_effect)
+					{
+						pre_post.f_cost = predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+						running_actions.back().functional_costs.push_back(pre_post);
+					} else
+						running_actions.back().functional_costs.push_back(pre_post);
+				}
+			}
+
+			g_current_time_value = predecessor.g_current_time_value + 0.01;
+
+		} else {
+			float op_end_time = 0;
+			vector<runn_action>::iterator it_ra = this->running_actions.begin();
+			for(; it_ra != this->running_actions.end();)
+			{
+				if((*it_ra).non_temporal_action_name == op.get_non_temporal_action_name())
+				{
+					op_end_time = (*it_ra).time_end;
+					it_ra = this->running_actions.erase(it_ra);
+				}else{
+					it_ra++;
+				}
+
+				break;
+			}
+			g_current_time_value = op_end_time;
+		}
+
+		// Copy locked variables
+		vector<blocked_var>::const_iterator it_bv = predecessor.blocked_vars.begin();
+		for(; it_bv != predecessor.blocked_vars.end(); it_bv++)
+		{
+			this->blocked_vars.push_back(*it_bv);
+		}
+
+		// Now update the locked variables, the operation is different for start and end actions
+		if(op.get_name().find("_start") != string::npos)
+		{
+			// Add blocks to variables
+			vector<PrePost>::const_iterator it_pb = op.get_pre_block().begin();
+			for(; it_pb != op.get_pre_block().end(); it_pb++ )
+			{
+				blocked_var* new_block = new(blocked_var);
+				new_block->var = it_pb-> var;
+				new_block->val = it_pb->post;
+				new_block->block_type = it_pb->pre;
+				new_block->time_set = predecessor.g_current_time_value;
+				new_block->time_freed = predecessor.g_current_time_value + op_duration;
+				new_block->non_temporal_action_name = op.get_non_temporal_action_name();
+
+				blocked_vars.push_back(*new_block);
+			}
+		}
+		else
+		{
+			// Remove blocks to variables
+			vector<blocked_var>::iterator it_pb = this->blocked_vars.begin();
+			for(; it_pb != this->blocked_vars.end();)
+			{
+				if(it_pb->non_temporal_action_name == op.get_non_temporal_action_name())
+				{
+					it_pb = this->blocked_vars.erase(it_pb);
+				} else
+					it_pb++;
+			}
+		}
+    }else
+    	g_time_value = op_duration;
+
+
     // Update values affected by operator.
     for(int i = 0; i < op.get_pre_post().size(); i++) {
+		const PrePost &pre_post = op.get_pre_post()[i];
+		if(pre_post.does_fire(predecessor))
+			vars[pre_post.var] = pre_post.post;
+    }
+
+    // Only truly update numeric values if the action is an end action
+    for(int i = 0; (i < op.get_pre_post().size()) && ((op.get_name().find("_end") != string::npos) || (is_temporal)) ; i++) {
 		const PrePost &pre_post = op.get_pre_post()[i];
 		if(pre_post.does_fire(predecessor)){
 			switch(pre_post.pre){
@@ -134,16 +267,12 @@ State::State(const State &predecessor, const Operator &op)
 				vars[pre_post.var] = pre_post.post;
 				float cal_cost = 0;
 				if (!pre_post.have_runtime_cost_effect){
-					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] + pre_post.f_cost;
+					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + pre_post.f_cost;
 				    cal_cost = pre_post.f_cost;
 				}
 				else{
 					cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
-					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] + cal_cost;
-				}
-
-				if (g_variable_name[pre_post.var] == total_time_var){
-					g_time_value = cal_cost;
+					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + cal_cost;
 				}
 
 				break;
@@ -151,20 +280,20 @@ State::State(const State &predecessor, const Operator &op)
 			case -3:
 				vars[pre_post.var] = pre_post.post;
 				if (!pre_post.have_runtime_cost_effect)
-					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] - pre_post.f_cost;
+					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] - pre_post.f_cost;
 				else{
 					float cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
-					numerc_vars_val[pre_post.var] = numerc_vars_val[pre_post.var] - cal_cost;
+					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] - cal_cost;
 				}
 				break;
 
 			case -4:
 				vars[pre_post.var] = pre_post.post;
 				if (!pre_post.have_runtime_cost_effect)
-					numerc_vars_val[pre_post.var] = pre_post.f_cost;
+					numeric_vars_val[pre_post.var] = pre_post.f_cost;
 				else{
 					float cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
-					numerc_vars_val[pre_post.var] = cal_cost;
+					numeric_vars_val[pre_post.var] = cal_cost;
 				}
 				break;
 
@@ -190,6 +319,10 @@ State::State(const State &predecessor, const Operator &op)
     		g_value = predecessor.get_g_value() + this->calculate_runtime_efect<float>(op.get_runtime_cost()) + 1;
     	}
     }
+
+    applied_actions = applied_actions + 1;
+    applied_actions_vec.push_back(op.get_name());
+
     if (g_use_metric) // if using action costs, all costs have been increased by 1
     	g_value = g_value - 1;
 }
@@ -316,7 +449,7 @@ int State::check_partial_plan(hash_set<const LandmarkNode*, hash_pointer>& reach
 }
 
 template <typename T>
-T State::calculate_runtime_efect(string s_effect){
+T State::calculate_runtime_efect(string s_effect) const {
 
 	// First get current value of runtime numerical variables
 	string s_eff_aux = s_effect;
@@ -329,7 +462,7 @@ T State::calculate_runtime_efect(string s_effect){
 		s_eff_aux = s_eff_aux.substr(s_eff_aux.find(":") + 1, s_eff_aux.length() - 1);
 		stringstream strm(var);
 		strm >> i_var;
-		var_value = numerc_vars_val[i_var];
+		var_value = numeric_vars_val[i_var];
    		std::ostringstream strm_var;
    		strm_var << var_value;
 

@@ -29,6 +29,7 @@
 #include <vector>
 #include <ext/hash_set>
 #include "landmarks_types.h"
+#include <string>
 
 using namespace std;
 using namespace __gnu_cxx;
@@ -36,6 +37,22 @@ using namespace __gnu_cxx;
 class Operator;
 class PrePost;
 class LandmarkNode;
+
+typedef struct{
+	int var;
+	int val;
+	int block_type;
+	float time_freed;
+	float time_set;
+	string non_temporal_action_name;
+} blocked_var;
+
+typedef struct{
+	float time_start;
+	float time_end;
+	string non_temporal_action_name;
+	vector<PrePost> functional_costs;
+} runn_action;
 
 class State {
     friend void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders);
@@ -45,6 +62,7 @@ class State {
 
     float g_value; // min. cost of reaching this state from the initial state
     float g_time_value;
+    float g_current_time_value;
     void set_landmarks_for_initial_state();
     void update_reached_lms(const Operator &op);
     bool landmark_is_leaf(const LandmarkNode& node, 
@@ -52,7 +70,11 @@ class State {
     bool check_lost_landmark_children_needed_again(const LandmarkNode& node) const;
     
 public:
-    vector<float> numerc_vars_val;
+    int applied_actions;
+    vector<blocked_var> blocked_vars;
+    vector<runn_action> running_actions;
+    vector<float> numeric_vars_val;
+    vector<string> applied_actions_vec;
     State(istream &in);
     State(const State &predecessor, const Operator &op);
     int &operator[](int index) {
@@ -66,12 +88,13 @@ public:
 
     float get_g_value() const {return g_value;}
     float get_g_time_value() const {return g_time_value;}
+    float get_g_current_time_value() const {return g_current_time_value;}
     void change_ancestor(const State &new_predecessor, const Operator &new_op);
 
     int check_partial_plan(hash_set<const LandmarkNode*, hash_pointer>& reached) const;
     int get_needed_landmarks(hash_set<const LandmarkNode*, hash_pointer>& needed) const;
     template <typename T>
-    T calculate_runtime_efect(string s_effect);
+    T calculate_runtime_efect(string s_effect) const;
 };
 
 #endif

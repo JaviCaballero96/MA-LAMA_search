@@ -29,6 +29,8 @@
 #include <string>
 using namespace std;
 
+bool is_temporal = false;
+
 Prevail::Prevail(istream &in) {
     in >> var >> prev;
 }
@@ -66,6 +68,8 @@ Operator::Operator(istream &in, bool axiom) {
         check_magic(in, "begin_operator");
         in >> ws;
         getline(in, name);
+        if((!is_temporal) && (name.find("_start") != string::npos) || (name.find("_end") != string::npos))
+        	is_temporal = true;
         int count;
         in >> count;
         for(int i = 0; i < count; i++)
@@ -73,6 +77,9 @@ Operator::Operator(istream &in, bool axiom) {
         in >> count;
         for(int i = 0; i < count; i++)
             pre_post.push_back(PrePost(in));
+        in >> count;
+        for(int i = 0; i < count; i++)
+            pre_block.push_back(PrePost(in));
 	float op_cost;
 	in >> op_cost;
 	// Note: increase cost of all actions by 1 to deal with
@@ -80,7 +87,7 @@ Operator::Operator(istream &in, bool axiom) {
 
 	//TODO float +1 no se pa que es esto
 	// cost = op_cost;
-	cost = g_use_metric ? op_cost + 1 : 1;
+	cost = op_cost + 1;
 
 	string s_aux = "";
 	in >> s_aux;
@@ -103,6 +110,13 @@ Operator::Operator(istream &in, bool axiom) {
         check_magic(in, "begin_rule");
         pre_post.push_back(PrePost(in));
         check_magic(in, "end_rule");
+    }
+
+    if(name.find("_start") != string::npos)
+    {
+    	non_temporal_name = name.substr(0, name.find("_start")) + name.substr(name.find("_start") + 6, name.length());
+    }else {
+    	non_temporal_name = name.substr(0, name.find("_end")) + name.substr(name.find("_end") + 4, name.length());
     }
 }
 

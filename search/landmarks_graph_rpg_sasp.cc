@@ -80,7 +80,7 @@ bool _possibly_reaches_lm(const Operator& o,
     for(unsigned i = 0; i < prepost.size(); i++) {
 	// If there is a precondition on the effect, check whether it can be reached
 	// Otherwise, operator is not applicable
-        if(prepost[i].pre != -1)
+        if(prepost[i].pre > -1)
             if(lvl_var[prepost[i].var][prepost[i].pre] == INT_MAX)
                 return false;
 
@@ -185,8 +185,8 @@ int LandmarksGraphNew::min_cost_for_landmark(LandmarkNode* bp,
 	    // bp true for the first time according to lvl_var
             if(_possibly_reaches_lm(op, lvl_var, bp)) 
 
-        // TO DO: float
-		min_cost = min(float(min_cost), op.get_cost());
+            	// TO DO: float
+            	min_cost = min(float(min_cost), op.get_cost());
         }
     }
 

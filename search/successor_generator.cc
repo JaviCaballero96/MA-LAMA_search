@@ -27,6 +27,8 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
+#include <string>
+
 using namespace std;
 
 class SuccessorGeneratorSwitch : public SuccessorGenerator {
@@ -34,8 +36,6 @@ class SuccessorGeneratorSwitch : public SuccessorGenerator {
     SuccessorGenerator *immediate_ops;
     vector<SuccessorGenerator *> generator_for_value;
     SuccessorGenerator *default_generator;
-    virtual void check_functional_validity(
-    		const State &curr, vector<const Operator *> &ops);
 public:
     SuccessorGeneratorSwitch(istream &in);
     virtual void generate_applicable_ops(const State &curr,
@@ -65,26 +65,89 @@ void SuccessorGeneratorSwitch::generate_applicable_ops(
     immediate_ops->generate_applicable_ops(curr, ops);
     generator_for_value[curr[switch_var]]->generate_applicable_ops(curr, ops);
     default_generator->generate_applicable_ops(curr, ops);
-    check_functional_validity(curr, ops);
+    /*check_functional_validity(curr, ops);
+    check_var_locks_validity(curr, ops);
+    check_temporal_soundness_validity(curr, ops);*/
 }
 
-void SuccessorGeneratorSwitch::check_functional_validity(
+void check_functional_validity(
 		const State &curr, vector<const Operator *> &ops) {
 	vector<const Operator *>::iterator it = ops.begin();
+
 	for(; it != ops.end();) {
 		const Operator * op = *it;
+
+		// we have to update the numeric values up to the point to which the action has been executed
+		// create an auxiliary numeric values vector
+		State* aux_state = new State(curr);
+		aux_state->numeric_vars_val = curr.numeric_vars_val;
+
+		// apply the numeric effects that are running, rules are:
+		// -- increase and decrease effects happen during all the time the action executes
+		// -- assign effects happen abruptly at the end of the action
+		// These rules aim to imitate real world behaviors
+
+		vector<runn_action>::const_iterator it_ra = curr.running_actions.begin();
+		for(; (is_temporal) && (it_ra != curr.running_actions.end()); ++it_ra) {
+
+			// calculate how much time has passed
+			float action_duration = (*it_ra).time_end - (*it_ra).time_start;
+			float time_passed = curr.get_g_current_time_value() - (*it_ra).time_start;
+			float peroneage_completed = (time_passed / action_duration);
+
+			vector<PrePost>::const_iterator it_fc = (*it_ra).functional_costs.begin();
+			for(; it_fc != (*it_ra).functional_costs.end(); ++it_fc) {
+
+				// calculate new values taking into account the time that has passed
+				PrePost pre_post = (*it_fc);
+				switch(pre_post.pre){
+					case -2:{
+						if (!pre_post.have_runtime_cost_effect){
+							aux_state->numeric_vars_val[pre_post.var] = aux_state->numeric_vars_val[pre_post.var] + (pre_post.f_cost * peroneage_completed);
+						}
+						else{
+							aux_state->numeric_vars_val[pre_post.var] = aux_state->numeric_vars_val[pre_post.var] +
+									(aux_state->calculate_runtime_efect<float>(pre_post.runtime_cost_effect) * peroneage_completed);
+						}
+
+						break;
+					}
+					case -3:
+						if (!pre_post.have_runtime_cost_effect)
+							aux_state->numeric_vars_val[pre_post.var] = aux_state->numeric_vars_val[pre_post.var] - (pre_post.f_cost * peroneage_completed);
+						else{
+							aux_state->numeric_vars_val[pre_post.var] = aux_state->numeric_vars_val[pre_post.var] -
+									(aux_state->calculate_runtime_efect<float>(pre_post.runtime_cost_effect) * peroneage_completed);
+						}
+						break;
+
+					case -4:
+					case -5:
+					case -6:
+						break;
+
+					default:
+						break;
+					}
+
+			}
+		}
+
+
+
+
 		bool op_valid = true;
 		vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
 		for(; it_pp != op->get_pre_post().end(); ++it_pp) {
 			PrePost pp = *it_pp;
 			if(pp.pre == -5)
 			{
-				if (curr.numerc_vars_val[pp.var] < pp.f_cost) {
+				if (aux_state->numeric_vars_val[pp.var] < pp.f_cost) {
 					op_valid = false;
 					break;
 				}
 			}else if(pp.pre == -6) {
-				if (curr.numerc_vars_val[pp.var] > pp.f_cost) {
+				if (aux_state->numeric_vars_val[pp.var] > pp.f_cost) {
 					op_valid = false;
 					break;
 				}
@@ -94,8 +157,119 @@ void SuccessorGeneratorSwitch::check_functional_validity(
 				break;
 		}
 
+		delete(aux_state);
+
 		if (!op_valid){
 			it = ops.erase(it);
+		}else
+			it++;
+	}
+}
+
+void check_var_locks_validity(
+		const State &curr, vector<const Operator *> &ops) {
+	vector<const Operator *>::iterator it = ops.begin();
+	for(; it != ops.end();) {
+		const Operator * op = *it;
+
+		// Get action duration, temporal duration, not snap.
+		// start --- end
+		float op_duration = 0;
+		if(op->get_name().find("_start") != string::npos)
+		{
+			vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
+			for(; it_pp != op->get_pre_post().end(); ++it_pp) {
+				PrePost pp = *it_pp;
+				if(g_variable_name[pp.var] == total_time_var)
+				{
+					if(pp.have_runtime_cost_effect)
+					{
+						op_duration = curr.get_g_current_time_value() + curr.calculate_runtime_efect<float>(pp.runtime_cost_effect);
+					} else{
+						op_duration = curr.get_g_current_time_value() + pp.f_cost;
+					}
+
+					break;
+				}
+			}
+		}
+
+
+		bool op_valid = true;
+		vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
+		for(; it_pp != op->get_pre_post().end(); ++it_pp) {
+			PrePost pp = *it_pp;
+			for(int k = 0; k < curr.blocked_vars.size(); k++)
+			{
+				if(curr.blocked_vars[k].var == pp.var)
+				{
+					if(curr.blocked_vars[k].block_type == -7)
+					{
+						// check if the block was set for this end action
+						if((curr.blocked_vars[k].non_temporal_action_name == op->get_non_temporal_action_name()))
+							continue;
+
+						// If the block is over all and the value is different, the action is not valid
+						// the time the variable is unblock is not relevant in this case
+						op_valid = false;
+						break;
+
+					} else{
+						// check if the block was set for this end action
+						if((curr.blocked_vars[k].non_temporal_action_name == op->get_non_temporal_action_name()))
+							continue;
+						// If the block is at the end of the action, then the time at which the variable is freed has to be considered
+						if(curr.blocked_vars[k].time_freed > op_duration){
+							op_valid = false;
+							break;
+						}
+					}
+				}
+			}
+
+			if(!op_valid)
+				break;
+		}
+
+		if (!op_valid){
+			it = ops.erase(it);
+
+		}else
+			it++;
+	}
+}
+
+void check_temporal_soundness_validity(
+		const State &curr, vector<const Operator *> &ops) {
+	// We have to assure that we do not apply actions that will happen later in time than others already running
+	vector<const Operator *>::iterator it = ops.begin();
+	for(; it != ops.end();) {
+		const Operator * op = *it;
+		bool op_valid = true;
+		if(op->get_name().find("_end") != string::npos)
+		{
+			// Check that the action ending is the one that must happen first
+			const runn_action* min_action_ending = NULL;
+			float min_time = -1;
+			vector<runn_action>::const_iterator it_ra_const = curr.running_actions.begin();
+			for(; (it_ra_const != curr.running_actions.end()); it_ra_const++)
+			{
+				if((min_time == -1) || (min_time > (*it_ra_const).time_end))
+				{
+					min_time = (*it_ra_const).time_end;
+					min_action_ending = &(*it_ra_const);
+				}
+			}
+
+			if((min_action_ending != NULL) && (min_action_ending->non_temporal_action_name != op->get_non_temporal_action_name()))
+			{
+				op_valid = false;
+			}
+		}
+
+		if (!op_valid){
+			it = ops.erase(it);
+
 		}else
 			it++;
 	}

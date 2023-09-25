@@ -110,6 +110,11 @@ int WAStarSearchEngine::step() {
 void WAStarSearchEngine::generate_successors(const State *parent_ptr) {
     vector<const Operator *> all_operators;
     g_successor_generator->generate_applicable_ops(current_state, all_operators);
+    check_functional_validity(current_state, all_operators);
+    if(is_temporal){
+		check_var_locks_validity(current_state, all_operators);
+		check_temporal_soundness_validity(current_state, all_operators);
+    }
     vector<const Operator *> preferred_operators;
     for(int i = 0; i < preferred_operator_heuristics.size(); i++) {
 	Heuristic *heur = preferred_operator_heuristics[i];
@@ -122,6 +127,8 @@ void WAStarSearchEngine::generate_successors(const State *parent_ptr) {
 	if(!heur->is_dead_end()) {
 	    float parent_h = heur->get_heuristic();
 	    float parent_g = parent_ptr->get_g_value();
+	    //if(parent_g == 0)
+	    //	parent_g = 1;
 	    float parent_f = weight * parent_h + parent_g;
 	    OpenList<OpenListEntry> &open = open_lists[i].open;
 	    vector<const Operator *> &ops =

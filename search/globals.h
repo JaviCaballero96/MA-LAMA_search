@@ -79,5 +79,6 @@ extern int g_cache_hits, g_cache_misses;
 extern FFHeuristic *g_ff_heur;
 extern LandmarksCountHeuristic *g_lm_heur;
 extern LandmarksGraph *g_lgraph;
+extern bool is_temporal;
 
 #endif

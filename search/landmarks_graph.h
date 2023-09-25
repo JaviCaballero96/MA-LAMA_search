@@ -49,7 +49,7 @@ public:
     hash_map<LandmarkNode*, edge_type, hash_pointer> parents;
     hash_map<LandmarkNode*, edge_type, hash_pointer> children;
     bool in_goal;
-    int min_cost; // minimal cost of achieving operators
+    float min_cost; // minimal cost of achieving operators
 
     hash_set<pair<int, int>, hash_int_pair> forward_orders;
   

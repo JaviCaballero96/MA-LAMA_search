@@ -54,7 +54,7 @@ struct PrePost {
     int pre, post;
     float f_cost;
     bool have_runtime_cost_effect;
-    string runtime_cost_effect;
+    std::string runtime_cost_effect;
     bool is_conditional_effect;
     std::vector<Prevail> cond;
     PrePost() {} // Needed for axiom file-reading constructor, unfortunately.
@@ -66,7 +66,10 @@ struct PrePost {
 	assert(var >= 0 && var < g_variable_name.size());
 	assert(pre == -1 || pre == -2 || pre == -3 || pre == -4  || pre == -5 || pre == -6 ||
 			(pre >= 0 && pre < g_variable_domain[var]));
-	return pre == -1 || state[var] == pre;
+	if (pre >= 0)
+		return pre == -1 || state[var] == pre;
+	else
+		return true;
     }
 
     bool does_fire(const State &state) const {
@@ -83,7 +86,9 @@ class Operator {
     bool is_an_axiom;
     std::vector<Prevail> prevail;      // var, val
     std::vector<PrePost> pre_post;     // var, old-val, new-val, effect conditions
+    vector<PrePost> pre_block;
     std::string name;
+	std::string non_temporal_name;
     float cost;
     bool have_runtime_cost;
     string runtime_cost;
@@ -96,6 +101,7 @@ public:
 
     const std::vector<Prevail> &get_prevail() const {return prevail;}
     const std::vector<PrePost> &get_pre_post() const {return pre_post;}
+    const std::vector<PrePost> &get_pre_block() const {return pre_block;}
 
     bool is_applicable(const State &state) const {
 	for(int i = 0; i < prevail.size(); i++)
@@ -108,6 +114,7 @@ public:
     }
     bool get_have_runtime_cost() const {return have_runtime_cost;};
     string get_runtime_cost() const {return runtime_cost;};
+    string get_non_temporal_action_name() const {return non_temporal_name;};
     float get_cost() const {return cost;};
 
 };
