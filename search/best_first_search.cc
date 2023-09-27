@@ -150,7 +150,7 @@ bool BestFirstSearchEngine::check_goal() {
 	vector<float> plan_temporal_info;
 	for(int i = 1; i < states_plan.size(); i++)
 	{
-		plan_temporal_info.push_back(states_plan[i].get_g_time_value());
+		plan_temporal_info.push_back(states_plan[i].get_g_current_time_value());
 	}
 	vector<float> plan_cost_info;
 	for(int i = 1; i < states_plan.size(); i++)
@@ -252,7 +252,14 @@ int BestFirstSearchEngine::fetch_next_state() {
 
     current_predecessor = next.parent;
     current_operator = next.op;
-    current_state = State(*current_predecessor, *current_operator);
+    try{
+    	current_state = State(*current_predecessor, *current_operator);
+    }
+    catch(...)
+    {
+    	cout << "This state will not generate successors" << endl;
+    	current_state = State(*current_predecessor, *current_operator);
+    }
 
     return IN_PROGRESS;
 }

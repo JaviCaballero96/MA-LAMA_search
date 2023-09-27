@@ -121,6 +121,32 @@ void WAStarSearchEngine::generate_successors(const State *parent_ptr) {
 	if(!heur->is_dead_end())
 	    heur->get_preferred_operators(preferred_operators);
     }
+    check_functional_validity(current_state, preferred_operators);
+    if(is_temporal){
+		check_var_locks_validity(current_state, preferred_operators);
+		check_temporal_soundness_validity(current_state, preferred_operators);
+    }
+
+    /* if(parent_ptr->running_actions.size() > 2)
+    {
+    	vector<const Operator *>::iterator it = all_operators.begin();
+    	for(; it != all_operators.end();) {
+
+    		if((*it)->get_name().find("_start") == string::npos) {
+    			it = all_operators.erase(it);
+    		}else
+    			it++;
+    	}
+
+    	it = preferred_operators.begin();
+		for(; it != preferred_operators.end();) {
+
+			if((*it)->get_name().find("_start") == string::npos) {
+				it = preferred_operators.erase(it);
+			}else
+				it++;
+		}
+    }*/
 
     for(int i = 0; i < open_lists.size(); i++) {
 	Heuristic *heur = open_lists[i].heuristic;

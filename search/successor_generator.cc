@@ -63,7 +63,8 @@ SuccessorGeneratorSwitch::SuccessorGeneratorSwitch(istream &in) {
 void SuccessorGeneratorSwitch::generate_applicable_ops(
     const State &curr, vector<const Operator *> &ops) {
     immediate_ops->generate_applicable_ops(curr, ops);
-    generator_for_value[curr[switch_var]]->generate_applicable_ops(curr, ops);
+    if(curr[switch_var] != -1)
+    	generator_for_value[curr[switch_var]]->generate_applicable_ops(curr, ops);
     default_generator->generate_applicable_ops(curr, ops);
     /*check_functional_validity(curr, ops);
     check_var_locks_validity(curr, ops);
@@ -157,7 +158,7 @@ void check_functional_validity(
 				break;
 		}
 
-		delete(aux_state);
+		delete aux_state ;
 
 		if (!op_valid){
 			it = ops.erase(it);

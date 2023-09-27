@@ -72,17 +72,17 @@ void State::update_reached_lms(const Operator &op) {
 		g_lgraph->landmark_reached(make_pair(pre_post.var, pre_post.post));
 	    if(node_p != 0) {
 		if(reached_lms.find(node_p) == reached_lms.end()) {
-		    cout << endl << "New LM reached! +++++++ ";
-		    g_lgraph->dump_node(node_p);
+		    //cout << endl << "New LM reached! +++++++ ";
+		    //g_lgraph->dump_node(node_p);
 		    // Only add leaves of landmark graph to reached
 		    const LandmarkNode& node = *node_p;
 		    if(landmark_is_leaf(node, reached_lms)) { 
-			cout << "inserting new LM into reached." << endl;
+			//cout << "inserting new LM into reached." << endl;
 			reached_lms.insert(node_p);
 			reached_lms_cost += node_p->min_cost;
 		    } 
-		    else
-		    cout << "not inserting into reached, has parents" << endl;
+		    //else
+		    //cout << "not inserting into reached, has parents" << endl;
 		}
 	    }
 	}
@@ -152,10 +152,10 @@ State::State(const State &predecessor, const Operator &op)
 				if((*it_ra_const).non_temporal_action_name == op.get_non_temporal_action_name()){
 					vector<PrePost>::const_iterator it_fc = (*it_ra_const).functional_costs.begin();
 					for(; (it_fc != op.get_pre_post().end()) && (op_duration == 0); ++it_fc) {
-						PrePost pp = *it_fc;
-						if(g_variable_name[pp.var] == total_time_var)
+						//PrePost pp = *it_fc;
+						if(g_variable_name[it_fc->var] == total_time_var)
 						{
-							op_duration = pp.f_cost;
+							op_duration = it_fc->f_cost;
 						}
 					}
 				}
@@ -320,7 +320,8 @@ State::State(const State &predecessor, const Operator &op)
     	}
     }
 
-    applied_actions = applied_actions + 1;
+    applied_actions = predecessor.applied_actions + 1;
+    applied_actions_vec = predecessor.applied_actions_vec;
     applied_actions_vec.push_back(op.get_name());
 
     if (g_use_metric) // if using action costs, all costs have been increased by 1
