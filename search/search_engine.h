@@ -34,7 +34,10 @@ private:
     Plan plan;
     float plan_cost;
     vector<float> plan_tamporal_info;
+    vector<float> plan_duration_info;
     vector<float> plan_cost_info;
+    vector<int> vars_end_state;
+    vector<float> num_vars_end_state;
 protected:
     enum {FAILED, SOLVED, IN_PROGRESS};
     virtual void initialize() {}
@@ -51,9 +54,15 @@ public:
     float get_plan_cost(){return plan_cost;};
     void set_plan_cost(float cost){plan_cost = cost;};
     void set_plan_temporal_info(vector<float> plan_temp){plan_tamporal_info = plan_temp;};
+    void set_plan_duration_info(vector<float> plan_temp){plan_duration_info = plan_temp;};
+    vector<float>  get_plan_duration_info(){return plan_duration_info;};
     vector<float>  get_plan_temporal_info(){return plan_tamporal_info;};
     void set_plan_cost_info(vector<float> plan_temp){plan_cost_info = plan_temp;};
-    vector<float>  get_plan_cost_info(){return plan_cost_info;};
+    void set_vars_end_state(vector<int> vars_state){vars_end_state = vars_state;}
+    void set_num_vars_end_state(vector<float> num_vars_state){num_vars_end_state = num_vars_state;}
+	vector<float> get_plan_cost_info(){return plan_cost_info;};
+    vector<int> get_end_state(){return vars_end_state;};
+    vector<float> get_num_end_state(){return num_vars_end_state;};
 };
 
 #endif

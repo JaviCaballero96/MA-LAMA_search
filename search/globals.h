@@ -42,7 +42,9 @@ class FFHeuristic;
 class LandmarksCountHeuristic;
 class LandmarksGraph;
 
-void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders);
+void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders, bool read_init_state, bool read_runtime_constraints);
+void read_runtime_contraints();
+void read_ext_init_state();
 void dump_everything();
 
 void check_magic(istream &in, string magic);
@@ -54,6 +56,15 @@ struct hash_operator_ptr {
     }
 };
 
+typedef struct{
+	int var;
+	int val_pre;
+	int val_pos;
+	float time_set;
+	float duration;
+	bool effect_applied;
+} ext_constraint;
+
 extern bool g_use_metric;
 extern bool g_length_metric;
 extern string g_op_metric;
@@ -63,6 +74,7 @@ extern vector<int> g_variable_domain;
 extern vector<int> g_axiom_layers;
 extern vector<int> g_default_axiom_values;
 extern string total_time_var;
+extern vector<ext_constraint*> external_blocked_vars;
 
 extern State *g_initial_state;
 extern vector<pair<int, int> > g_goal;

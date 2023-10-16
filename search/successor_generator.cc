@@ -167,6 +167,82 @@ void check_functional_validity(
 	}
 }
 
+void check_external_locks_validity(const State &curr, vector<const Operator *> &ops) {
+	vector<const Operator *>::iterator it = ops.begin();
+	for(; it != ops.end();) {
+		const Operator * op = *it;
+		bool op_valid = true;
+
+		// Get action duration, temporal duration, not snap.
+		// start --- end
+		float op_end_time = curr.get_g_current_time_value() + 0.01;
+		if(op->get_name().find("_end") != string::npos)
+		{
+			vector<runn_action>::const_iterator it_ra = curr.running_actions.begin();
+			for(; it_ra != curr.running_actions.end();)
+			{
+				if((*it_ra).non_temporal_action_name == op->get_non_temporal_action_name())
+				{
+					op_end_time = (*it_ra).time_end;
+				}else{
+					it_ra++;
+				}
+
+				break;
+			}
+		}
+
+		for(int k = 0; k < external_blocked_vars.size(); k++)
+		{
+			if((external_blocked_vars[k]->time_set >= curr.get_g_current_time_value()) &&
+					(external_blocked_vars[k]->time_set < op_end_time))
+			{
+				bool action_changes_constraint = false;
+				vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
+				for(; it_pp != op->get_pre_post().end(); ++it_pp) {
+					PrePost pp = *it_pp;
+					if(pp.var == external_blocked_vars[k]->var)
+					{
+						action_changes_constraint = true;
+						if(external_blocked_vars[k]->val_pre == -2)
+						{
+							op_valid = false;
+							break;
+						}
+						if(((pp.pre != external_blocked_vars[k]->val_pre)  &&
+								((external_blocked_vars[k]->val_pre != -1) && (pp.pre != -1))) || (pp.post != external_blocked_vars[k]->val_pos)) {
+							op_valid = false;
+							break;
+						}
+					}
+				}
+				if(!action_changes_constraint)
+				{
+					if(external_blocked_vars[k]->val_pre == -2)
+					{
+						if(curr[external_blocked_vars[k]->var] != external_blocked_vars[k]->val_pos)
+						{
+							op_valid = false;
+							break;
+						}
+					}
+					else if(curr[external_blocked_vars[k]->var] != external_blocked_vars[k]->val_pre)
+					{
+						op_valid = false;
+						break;
+					}
+				}
+			}
+		}
+
+		if (!op_valid){
+			it = ops.erase(it);
+
+		}else
+			it++;
+	}
+}
+
 void check_var_locks_validity(
 		const State &curr, vector<const Operator *> &ops) {
 	vector<const Operator *>::iterator it = ops.begin();

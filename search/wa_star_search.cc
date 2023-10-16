@@ -111,6 +111,7 @@ void WAStarSearchEngine::generate_successors(const State *parent_ptr) {
     vector<const Operator *> all_operators;
     g_successor_generator->generate_applicable_ops(current_state, all_operators);
     check_functional_validity(current_state, all_operators);
+    check_external_locks_validity(current_state, all_operators);
     if(is_temporal){
 		check_var_locks_validity(current_state, all_operators);
 		check_temporal_soundness_validity(current_state, all_operators);
@@ -122,6 +123,7 @@ void WAStarSearchEngine::generate_successors(const State *parent_ptr) {
 	    heur->get_preferred_operators(preferred_operators);
     }
     check_functional_validity(current_state, preferred_operators);
+    check_external_locks_validity(current_state, preferred_operators);
     if(is_temporal){
 		check_var_locks_validity(current_state, preferred_operators);
 		check_temporal_soundness_validity(current_state, preferred_operators);

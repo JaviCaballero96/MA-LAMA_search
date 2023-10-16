@@ -28,6 +28,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <fstream>
 using namespace std;
 
 #include "axioms.h"
@@ -126,7 +127,7 @@ void dump_goal() {
 
 void read_operators(istream &in) {
     int count;
-    is_temporal = true;
+    is_temporal = false;
     in >> count;
     for(int i = 0; i < count; i++)
         g_operators.push_back(Operator(in, false));
@@ -156,11 +157,19 @@ void build_landmarks_graph(bool reasonable_orders) {
     //g_lgraph->dump();
 }
 
-void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders) {
+void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders, bool read_init_state, bool read_runtime_constraints) {
     read_metric(in);
     read_variables(in);
     g_initial_state = new State(in);
+    if(read_init_state)
+    {
+    	read_ext_init_state();
+    }
     read_shared(in);
+    if(read_runtime_constraints)
+    {
+    	read_runtime_contraints();
+    }
     read_goal(in);
     read_operators(in);
     read_axioms(in);
@@ -191,6 +200,139 @@ void dump_everything() {
         g_transition_graphs[i]->dump();
 }
 
+void read_runtime_contraints()
+{
+	std::fstream in;
+	in.open ("current_constraints", std::fstream::in);
+	check_magic(in, "begin_constraints");
+	while(true)
+	{
+		float time_init = 0;
+		float act_duration = 0;
+		string s_aux = "";
+		in >> time_init;
+		if(time_init == -1)
+		{
+			break;
+		}
+		in >> act_duration;
+
+		ext_constraint* bv = new(ext_constraint);
+		bv->effect_applied = false;
+		bv->time_set = time_init;
+		bv->duration = act_duration;
+		bool remaining_constraints = true;
+
+		while(remaining_constraints)
+		{
+			in >> s_aux;
+			if(s_aux.find("(") != string::npos){
+				s_aux = s_aux.substr(s_aux.find("(") + 1, s_aux.length());
+			}
+
+			if(s_aux == "1")
+			{
+				int i_aux = 0;
+				in >> i_aux;
+			    for(int z = 0; z < g_shared_vars.size(); z++)
+			    {
+			    	int shared_number_1 = atoi((g_shared_vars[z].first.substr(3, g_shared_vars[z].first.length())).c_str());
+			    	int shared_number_2 = g_shared_vars[z].second;
+
+			    	if(shared_number_1 == i_aux)
+			    	{
+			    		i_aux = shared_number_2;
+			    		break;
+			    	}
+			    }
+				bv->var = i_aux;
+				in >> i_aux;
+				bv->val_pre = i_aux;
+				in >> s_aux;
+				if(s_aux.find(")") != string::npos) {
+					s_aux = s_aux.substr(0, s_aux.find(")"));
+					bv->val_pos = std::atof(s_aux.c_str());
+					remaining_constraints = false;
+				} else{
+					bv->val_pos = std::atof(s_aux.c_str());
+					assert(s_aux == "|");
+				}
+
+			} else
+			{
+				bv->effect_applied  = true;
+				int i_aux = 0;
+				in >> i_aux;
+				bv->var = i_aux;
+				bv->val_pre = -2;
+				in >> s_aux;
+				if(s_aux.find(")") != string::npos) {
+					s_aux = s_aux.substr(0, s_aux.find(")"));
+					bv->val_pos = std::atof(s_aux.c_str());
+					remaining_constraints = false;
+				} else{
+					bv->val_pos = std::atof(s_aux.c_str());
+					in >> s_aux;
+					assert(s_aux == "|");
+				}
+			}
+			external_blocked_vars.push_back(bv);
+		}
+
+	}
+	check_magic(in, "end_constraints");
+}
+
+void read_ext_init_state()
+{
+	std::fstream in;
+	int var_list_size;
+	string slash = "";
+	in.open ("end_state", std::fstream::in);
+	check_magic(in, "begin_state");
+	in >> var_list_size;
+	for(int i = 0; i < var_list_size; i++)
+	{
+		string var_name = "";
+		int val = 0;
+		in >> var_name;
+		in >> slash;
+		in >> val;
+		for(int j = 0; j < g_variable_name.size(); j++)
+		{
+			if(var_name == g_variable_name[j])
+			{
+				g_initial_state->set_var_value(j, val);
+				break;
+			}
+		}
+	}
+	check_magic(in, "end_state");
+	check_magic(in, "begin_num_state");
+	in >> var_list_size;
+	for(int i = 0; i < var_list_size; i++)
+	{
+		string var_name = "";
+		string aux = "";
+		in >> var_name;
+		in >> aux;
+		if(aux == "-")
+		{
+			float val = 0;
+			in >> val;
+			for(int j = 0; j < g_variable_name.size(); j++)
+			{
+				if(var_name == g_variable_name[j])
+				{
+					g_initial_state->numeric_vars_val[j] = val;
+					break;
+				}
+			}
+		}
+	}
+	check_magic(in, "end_num_state");
+}
+
 bool g_use_metric;
 bool g_length_metric;
 string g_op_metric;
@@ -201,6 +343,7 @@ vector<int> g_axiom_layers;
 string total_time_var;
 vector<int> g_default_axiom_values;
 State *g_initial_state;
+vector<ext_constraint*> external_blocked_vars;
 vector<pair<int, int> > g_goal;
 vector<pair<string, int> > g_shared_vars;
 vector<Operator> g_operators;

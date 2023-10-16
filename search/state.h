@@ -55,7 +55,7 @@ typedef struct{
 } runn_action;
 
 class State {
-    friend void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders);
+    friend void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders, bool read_init_state, bool read_runtime_constraints);
     vector<int> vars; // values for vars
     hash_set<const LandmarkNode *, hash_pointer> reached_lms;
     int reached_lms_cost;
@@ -83,6 +83,9 @@ public:
     int operator[](int index) const {
 	return vars[index];
     }
+    void set_var_value(int index, int value) {
+    	vars[index] = value;
+    }
     void dump() const;
     bool operator<(const State &other) const;
 
@@ -90,6 +93,8 @@ public:
     float get_g_time_value() const {return g_time_value;}
     float get_g_current_time_value() const {return g_current_time_value;}
     void change_ancestor(const State &new_predecessor, const Operator &new_op);
+    vector<int> get_vars_state(){return vars;};
+    vector<float> get_num_vars_state(){return numeric_vars_val;};
 
     int check_partial_plan(hash_set<const LandmarkNode*, hash_pointer>& reached) const;
     int get_needed_landmarks(hash_set<const LandmarkNode*, hash_pointer>& needed) const;

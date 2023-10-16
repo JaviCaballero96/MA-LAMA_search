@@ -40,6 +40,8 @@ public:
 SuccessorGenerator *read_successor_generator(std::istream &in);
 void check_functional_validity(
 		const State &curr, vector<const Operator *> &ops);
+void check_external_locks_validity(
+		const State &curr, vector<const Operator *> &ops);
 void check_var_locks_validity(
 		const State &curr, vector<const Operator *> &ops);
 void check_temporal_soundness_validity(

@@ -31,6 +31,8 @@
 #include "landmarks_graph_rpg_sasp.h"
 #include "landmarks_count_heuristic.h"
 
+#include <limits>
+#include <filesystem>
 #include <cassert>
 #include <iostream>
 #include <fstream>
@@ -44,7 +46,11 @@
 using namespace std;
 
 
-float save_plan(const vector<const Operator *> &plan, const float cost,const string& filename, int iteration, vector<float> plan_temporal_info, vector<float> plan_cost_info);
+float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
+		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info, vector<float> plan_cost_info,
+		vector<int> vars_end_state, vector<float> num_vars_end_state);
+void print_previous_constraints(ofstream& constraints_outfile);
+void print_vars_end_state(ofstream& state_outfile, vector<int> vars_end_state, vector<float> num_vars_end_state);
 
 void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators, 
 			   bool landmarks_heuristic, 
@@ -62,6 +68,8 @@ int main(int argc, const char **argv) {
     bool landmarks_heuristic = false, landmarks_preferred_operators = false;
     bool reasonable_orders = true;
     bool iterative_search = false;
+    bool read_init_state = false;
+    bool read_runtime_constraints = false;
 
     std::fstream fs;
 
@@ -83,6 +91,10 @@ int main(int argc, const char **argv) {
                 search_type = wa_star;
 	    } else if(*c == 'i') {
                 iterative_search = true;
+	    } else if(*c == 'c'){
+	    	read_runtime_constraints = true;
+	    } else if(*c == 's'){
+	    	read_init_state = true;
 	    } else {
 		cerr << "Unknown option: " << *c << endl;
 		return 1;
@@ -114,7 +126,7 @@ int main(int argc, const char **argv) {
     if(landmarks_heuristic || landmarks_preferred_operators) 
 	generate_landmarks = true;
     times(&landmarks_generation_start);
-    read_everything(fs, generate_landmarks, reasonable_orders);
+    read_everything(fs, generate_landmarks, reasonable_orders, read_init_state, read_runtime_constraints);
     // dump_everything();
     times(&landmarks_generation_end);
     int landmarks_generation_ms = (landmarks_generation_end.tms_utime - 
@@ -190,7 +202,9 @@ int main(int argc, const char **argv) {
 	times(&search_end);
 	float plan_cost = FLT_MAX;
 	if(engine->found_solution())
-	    plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no, engine->get_plan_temporal_info(), engine->get_plan_cost_info());
+	    plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no,
+	    		engine->get_plan_temporal_info(), engine->get_plan_duration_info(), engine->get_plan_cost_info(),
+				engine->get_end_state(), engine->get_num_end_state());
 
 	engine->statistics();
 
@@ -224,10 +238,16 @@ int main(int argc, const char **argv) {
     return solution_found ? 0 : 1; 
 }
 
-float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename, int iteration, vector<float> plan_temporal_info, vector<float> plan_cost_info) {
+float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
+		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info,
+		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state) {
     ofstream outfile;
+    string state_outfile_name = "end_state";
+    ofstream state_outfile;
+    string constraints_outfile_name = "current_constraints";
+    ofstream constraints_outfile;
     float plan_cost = 0;
-    bool separate_outfiles = true; // IPC conditions, change to false for a single outfile.
+    bool separate_outfiles = false; // IPC conditions, change to false for a single outfile.
     if(separate_outfiles) {
 	// Write a separat output file for each plan found by iterative search
 	stringstream it_no;
@@ -236,8 +256,12 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
     }
     else {
 	// Write newest plan always to same output file
-	outfile.open(filename.c_str(), ios::out);
+	outfile.open((filename + ".1").c_str(), ios::out);
     }
+    remove(state_outfile_name.c_str());
+    state_outfile.open(state_outfile_name.c_str(), ios::out);
+    constraints_outfile.open(constraints_outfile_name.c_str(), ios::out);
+    constraints_outfile << "begin_constraints" << endl;
     for(int i = 0; i < plan.size(); i++) {
 		float action_cost =  plan_cost_info[i];
 		if (i != 0){
@@ -248,12 +272,13 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 
 		plan_cost += action_cost;
 
-		float duration = plan_temporal_info[i];
+		float action_init_time= plan_temporal_info[i];
+		float action_duration_time= plan_duration_info[i];
 
 		if(!g_use_metric)
-			cout << duration << " " << plan[i]->get_name() << endl;
+			cout << action_init_time << " " << action_duration_time << " " << plan[i]->get_name() << endl;
 		else
-			cout << duration << " " << plan[i]->get_name() << " ("
+			cout << action_init_time << " " << action_duration_time << " " << plan[i]->get_name() << " ("
 			 << action_cost << ")" << endl;
 
 		/* Check if sharerd vars have been modified */
@@ -323,23 +348,111 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 
 		if(shared_str == "(")
 		{
-			outfile << duration << " " << "(" << plan[i]->get_name() << ") " << action_cost << " no_constraints" << endl;
+			outfile << action_init_time << " " << "(" << plan[i]->get_name() << ") " << action_cost << endl;
 		}else
 		{
 			shared_str = shared_str.substr(0, shared_str.size() - 3);
 			shared_str = shared_str + ")";
-			outfile << duration << " " << "(" << plan[i]->get_name() << ") " << action_cost << " " << shared_str << endl;
+			outfile << action_duration_time << " " << "(" << plan[i]->get_name() << ") " << action_cost << endl;
+			constraints_outfile << action_init_time << " " << action_duration_time << " " << shared_str << endl;
 		}
 
     }
     outfile << "Cost: " <<  plan_cost << endl;
     outfile.close();
+    print_vars_end_state(state_outfile, vars_end_state, num_vars_end_state);
+    state_outfile.close();
+    print_previous_constraints(constraints_outfile);
+    constraints_outfile << "-1" << endl << "end_constraints" << endl;
+    constraints_outfile.close();
     if(!g_use_metric)
 	cout << "Plan length: " << plan.size() << " step(s)." << endl;
     else 
 	cout << "Plan length: " << plan.size() << " step(s), cost: " 
 	     << plan_cost << "." << endl;
     return cost;
+}
+
+void print_previous_constraints(ofstream& constraints_outfile)
+{
+	for(int i = 0; i < external_blocked_vars.size(); i++)
+	{
+		for(int z = 0; z < g_shared_vars.size(); z++)
+		{
+			int shared_number_1 = atoi((g_shared_vars[z].first.substr(3, g_shared_vars[z].first.length())).c_str());
+			int shared_number_2 = g_shared_vars[z].second;
+
+			if(shared_number_2 == external_blocked_vars[i]->var)
+			{
+				string shared_str = "";
+
+				if(external_blocked_vars[i]->val_pre != -2)
+				{
+					std::stringstream ss1;
+					ss1 << external_blocked_vars[i]->time_set;
+					string time_set = ss1.str();
+					ss1.str("");
+					ss1 << external_blocked_vars[i]->duration;
+					string duration = ss1.str();
+					ss1.str("");
+					ss1 << shared_number_1;
+					string shared_number = ss1.str();
+					ss1.str("");
+					ss1 << external_blocked_vars[i]->val_pre;
+					string val_pre = ss1.str();
+					ss1.str("");
+					ss1 << external_blocked_vars[i]->val_pos;
+					string val_pos = ss1.str();
+					ss1.str("");
+					shared_str = time_set + " " + duration + "(1 " + " " + shared_number + " " + val_pre + " " + val_pos + ")";
+				} else {
+					std::stringstream ss1;
+					ss1 << external_blocked_vars[i]->time_set;
+					string time_set = ss1.str();
+					ss1.str("");
+					ss1 << external_blocked_vars[i]->duration;
+					string duration = ss1.str();
+					ss1.str("");
+					ss1 << shared_number_1;
+					string shared_number = ss1.str();
+					ss1.str("");
+					ss1 << external_blocked_vars[i]->val_pos;
+					string val_pos = ss1.str();
+					ss1.str("");
+					shared_str = time_set + " " + duration + "(0 " + " " + shared_number + " " + val_pos + ")";
+				}
+
+				constraints_outfile << shared_str << endl;
+				break;
+			}
+		}
+	}
+}
+
+void print_vars_end_state(ofstream& state_outfile, vector<int> vars_end_state, vector<float> num_vars_end_state)
+{
+	state_outfile << "begin_state" << endl;
+	state_outfile << vars_end_state.size() << endl;
+	for(int i = 0; i < vars_end_state.size(); i++)
+	{
+		state_outfile << g_variable_name[i] << " - " << vars_end_state[i] << endl;
+
+	}
+	state_outfile << "end_state" << endl;
+
+	state_outfile << "begin_num_state" << endl;
+	state_outfile << num_vars_end_state.size() << endl;
+	for(int i = 0; i < num_vars_end_state.size(); i++)
+	{
+		if(num_vars_end_state[i] != numeric_limits<float>::max())
+		{
+			state_outfile << g_variable_name[i] << " - " << num_vars_end_state[i] << endl;
+		}else
+		{
+			state_outfile << g_variable_name[i] << " ! " << endl;
+		}
+	}
+	state_outfile << "end_num_state" << endl;
 }
 
 void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators, 
