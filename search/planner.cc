@@ -348,7 +348,7 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 
 		if(shared_str == "(")
 		{
-			outfile << action_init_time << " " << "(" << plan[i]->get_name() << ") " << action_cost << endl;
+			outfile << action_duration_time << " " << "(" << plan[i]->get_name() << ") " << action_cost << endl;
 		}else
 		{
 			shared_str = shared_str.substr(0, shared_str.size() - 3);

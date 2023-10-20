@@ -61,61 +61,63 @@ int WAStarSearchEngine::step() {
 
     // Evaluate only if g-cost of state is lower than bound
     if(bound != float(-1) && current_state.get_g_value() >= bound) {
-	return fetch_next_state();
+    	return fetch_next_state();
     }
 
     bool evaluate = false;
     const State *parent_ptr = 0;
     if(!closed_list.contains(current_state)) {  
-	parent_ptr = closed_list.insert(
-	    current_state, current_predecessor, current_operator);
-	evaluate = true;
+    	parent_ptr = closed_list.insert(
+    			current_state, current_predecessor, current_operator);
+		evaluate = true;
     }
     else {
-	parent_ptr = closed_list.find(current_state);
-	if(current_state.get_g_value() < parent_ptr->get_g_value()) {
-	    // Re-evaluate, since we have found a shorter path to this state.
-	    // We need a const_cast here, as we have to modify parent, but the 
-            // STL Map underlying closed_list returns a const_iterator. However, cast
-            // is safe as modification of parent does not effect its position in closed_list.
-	    State *modifiable_parent_ptr = const_cast<State*> (parent_ptr);
-	    // Change g-value and reached landmarks in state
-	    modifiable_parent_ptr->change_ancestor(*current_predecessor, *current_operator);
-	    // Record new predecessor for state in closed_list
-	    closed_list.update(current_state, current_predecessor, current_operator); 
-	    evaluate = true;
-	}
+    	parent_ptr = closed_list.find(current_state);
+    	if(current_state.get_g_value() < parent_ptr->get_g_value()) {
+			// Re-evaluate, since we have found a shorter path to this state.
+			// We need a const_cast here, as we have to modify parent, but the
+				// STL Map underlying closed_list returns a const_iterator. However, cast
+				// is safe as modification of parent does not effect its position in closed_list.
+			State *modifiable_parent_ptr = const_cast<State*> (parent_ptr);
+			// Change g-value and reached landmarks in state
+			modifiable_parent_ptr->change_ancestor(*current_predecessor, *current_operator);
+			// Record new predecessor for state in closed_list
+			closed_list.update(current_state, current_predecessor, current_operator);
+			evaluate = true;
+    	}
     }
     if(evaluate) {
-	if(g_lm_heur != NULL)
-	    g_lm_heur->set_recompute_heuristic(current_state);
-	if(g_ff_heur != NULL)
-	    g_ff_heur->set_recompute_heuristic(); 
-        for(int i = 0; i < heuristics.size(); i++) 
-            heuristics[i]->evaluate(current_state);   
- 	
-	if(!is_dead_end()) {
-	    if(check_goal())
-		return SOLVED;
-	    if(check_progress()) {
-		report_progress();
-		reward_progress();
-	    }
-	    generate_successors(parent_ptr);
-	}
+		if(g_lm_heur != NULL)
+			g_lm_heur->set_recompute_heuristic(current_state);
+		if(g_ff_heur != NULL)
+			g_ff_heur->set_recompute_heuristic();
+			for(int i = 0; i < heuristics.size(); i++)
+				heuristics[i]->evaluate(current_state);
+
+		if(!is_dead_end()) {
+			if(check_goal())
+			return SOLVED;
+			if(check_progress()) {
+			report_progress();
+			reward_progress();
+			}
+			generate_successors(parent_ptr);
+		}
     }
     return fetch_next_state();
 }
+
 
 void WAStarSearchEngine::generate_successors(const State *parent_ptr) {
     vector<const Operator *> all_operators;
     g_successor_generator->generate_applicable_ops(current_state, all_operators);
     check_functional_validity(current_state, all_operators);
-    check_external_locks_validity(current_state, all_operators);
     if(is_temporal){
 		check_var_locks_validity(current_state, all_operators);
 		check_temporal_soundness_validity(current_state, all_operators);
     }
+    check_external_locks_validity(current_state, all_operators);
+
     vector<const Operator *> preferred_operators;
     for(int i = 0; i < preferred_operator_heuristics.size(); i++) {
 	Heuristic *heur = preferred_operator_heuristics[i];
@@ -123,13 +125,13 @@ void WAStarSearchEngine::generate_successors(const State *parent_ptr) {
 	    heur->get_preferred_operators(preferred_operators);
     }
     check_functional_validity(current_state, preferred_operators);
-    check_external_locks_validity(current_state, preferred_operators);
     if(is_temporal){
 		check_var_locks_validity(current_state, preferred_operators);
 		check_temporal_soundness_validity(current_state, preferred_operators);
     }
+    check_external_locks_validity(current_state, preferred_operators);
 
-    /* if(parent_ptr->running_actions.size() > 2)
+    /*if(parent_ptr->running_actions.size() > 4)
     {
     	vector<const Operator *>::iterator it = all_operators.begin();
     	for(; it != all_operators.end();) {
@@ -163,10 +165,10 @@ void WAStarSearchEngine::generate_successors(const State *parent_ptr) {
 		open_lists[i].only_preferred_operators ?
 		preferred_operators : all_operators;
 	    for(int j = 0; j < ops.size(); j++) {
-		int h = parent_f + ops[j]->get_cost();
-		int tie_braker = parent_g + ops[j]->get_cost();
-		open.insert(make_pair(h, tie_braker), 
-			    OpenListEntry(parent_ptr, ops[j], parent_h));
+			int h = parent_f + ops[j]->get_cost();
+			int tie_braker = parent_g + ops[j]->get_cost();
+			open.insert(make_pair(h, tie_braker),
+					OpenListEntry(parent_ptr, ops[j], parent_h));
 	    }
 	}
     }

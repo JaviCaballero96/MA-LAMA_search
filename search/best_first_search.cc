@@ -220,12 +220,45 @@ void BestFirstSearchEngine::reward_progress() {
 void BestFirstSearchEngine::generate_successors(const State *parent_ptr) {
     vector<const Operator *> all_operators;
     g_successor_generator->generate_applicable_ops(current_state, all_operators);
+    check_functional_validity(current_state, all_operators);
+    if(is_temporal){
+		check_var_locks_validity(current_state, all_operators);
+		check_temporal_soundness_validity(current_state, all_operators);
+    }
+    // heck_external_locks_validity(current_state, all_operators);
 
     vector<const Operator *> preferred_operators;
     for(int i = 0; i < preferred_operator_heuristics.size(); i++) {
 	Heuristic *heur = preferred_operator_heuristics[i];
 	if(!heur->is_dead_end())
 	    heur->get_preferred_operators(preferred_operators);
+    }
+    check_functional_validity(current_state, preferred_operators);
+    if(is_temporal){
+		check_var_locks_validity(current_state, preferred_operators);
+		check_temporal_soundness_validity(current_state, preferred_operators);
+    }
+    // check_external_locks_validity(current_state, preferred_operators);
+
+    if(parent_ptr->running_actions.size() > 1)
+    {
+    	vector<const Operator *>::iterator it = all_operators.begin();
+    	for(; it != all_operators.end();) {
+
+    		if((*it)->get_name().find("_start") == string::npos) {
+    			it = all_operators.erase(it);
+    		}else
+    			it++;
+    	}
+
+    	it = preferred_operators.begin();
+		for(; it != preferred_operators.end();) {
+
+			if((*it)->get_name().find("_start") == string::npos) {
+				it = preferred_operators.erase(it);
+			}else
+				it++;
+		}
     }
 
     for(int i = 0; i < open_lists.size(); i++) {

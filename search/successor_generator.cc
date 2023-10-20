@@ -96,11 +96,11 @@ void check_functional_validity(
 			float time_passed = curr.get_g_current_time_value() - (*it_ra).time_start;
 			float peroneage_completed = (time_passed / action_duration);
 
-			vector<PrePost>::const_iterator it_fc = (*it_ra).functional_costs.begin();
+			vector<PrePost*>::const_iterator it_fc = (*it_ra).functional_costs.begin();
 			for(; it_fc != (*it_ra).functional_costs.end(); ++it_fc) {
 
 				// calculate new values taking into account the time that has passed
-				PrePost pre_post = (*it_fc);
+				PrePost pre_post = *(*it_fc);
 				switch(pre_post.pre){
 					case -2:{
 						if (!pre_post.have_runtime_cost_effect){
@@ -199,25 +199,9 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 			{
 				bool action_changes_constraint = false;
 				vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
-				for(; it_pp != op->get_pre_post().end(); ++it_pp) {
-					PrePost pp = *it_pp;
-					if(pp.var == external_blocked_vars[k]->var)
-					{
-						action_changes_constraint = true;
-						if(external_blocked_vars[k]->val_pre == -2)
-						{
-							op_valid = false;
-							break;
-						}
-						if(((pp.pre != external_blocked_vars[k]->val_pre)  &&
-								((external_blocked_vars[k]->val_pre != -1) && (pp.pre != -1))) || (pp.post != external_blocked_vars[k]->val_pos)) {
-							op_valid = false;
-							break;
-						}
-					}
-				}
-				if(!action_changes_constraint)
+				for(; it_pp != op->get_pre_post().end(); ++it_pp)
 				{
+
 					if(external_blocked_vars[k]->val_pre == -2)
 					{
 						if(curr[external_blocked_vars[k]->var] != external_blocked_vars[k]->val_pos)
@@ -226,7 +210,7 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 							break;
 						}
 					}
-					else if(curr[external_blocked_vars[k]->var] != external_blocked_vars[k]->val_pre)
+					else if((curr[external_blocked_vars[k]->var] != external_blocked_vars[k]->val_pre) && (external_blocked_vars[k]->val_pre != -1))
 					{
 						op_valid = false;
 						break;
@@ -234,6 +218,7 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 				}
 			}
 		}
+
 
 		if (!op_valid){
 			it = ops.erase(it);

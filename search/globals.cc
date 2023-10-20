@@ -234,6 +234,7 @@ void read_runtime_contraints()
 			{
 				int i_aux = 0;
 				in >> i_aux;
+				bool var_found = false;
 			    for(int z = 0; z < g_shared_vars.size(); z++)
 			    {
 			    	int shared_number_1 = atoi((g_shared_vars[z].first.substr(3, g_shared_vars[z].first.length())).c_str());
@@ -241,10 +242,26 @@ void read_runtime_contraints()
 
 			    	if(shared_number_1 == i_aux)
 			    	{
+			    		var_found = true;
 			    		i_aux = shared_number_2;
 			    		break;
 			    	}
 			    }
+			    if(!var_found)
+				{
+			    	in >> i_aux;
+			    	in >> s_aux;
+					if(s_aux.find(")") != string::npos) {
+						s_aux = s_aux.substr(0, s_aux.find(")"));
+						bv->val_pos = std::atof(s_aux.c_str());
+						remaining_constraints = false;
+					} else{
+						bv->val_pos = std::atof(s_aux.c_str());
+						in >> s_aux;
+						assert(s_aux == "|");
+					}
+					continue;
+				}
 				bv->var = i_aux;
 				in >> i_aux;
 				bv->val_pre = i_aux;
@@ -255,6 +272,7 @@ void read_runtime_contraints()
 					remaining_constraints = false;
 				} else{
 					bv->val_pos = std::atof(s_aux.c_str());
+					in >> s_aux;
 					assert(s_aux == "|");
 				}
 
@@ -263,6 +281,34 @@ void read_runtime_contraints()
 				bv->effect_applied  = true;
 				int i_aux = 0;
 				in >> i_aux;
+				in >> i_aux;
+				bool var_found = false;
+			    for(int z = 0; z < g_shared_vars.size(); z++)
+			    {
+			    	int shared_number_1 = atoi((g_shared_vars[z].first.substr(3, g_shared_vars[z].first.length())).c_str());
+			    	int shared_number_2 = g_shared_vars[z].second;
+
+			    	if(shared_number_1 == i_aux)
+			    	{
+			    		var_found = true;
+			    		i_aux = shared_number_2;
+			    		break;
+			    	}
+			    }
+			    if(!var_found)
+				{
+			    	in >> s_aux;
+					if(s_aux.find(")") != string::npos) {
+						s_aux = s_aux.substr(0, s_aux.find(")"));
+						bv->val_pos = std::atof(s_aux.c_str());
+						remaining_constraints = false;
+					} else{
+						bv->val_pos = std::atof(s_aux.c_str());
+						in >> s_aux;
+						assert(s_aux == "|");
+					}
+					continue;
+				}
 				bv->var = i_aux;
 				bv->val_pre = -2;
 				in >> s_aux;

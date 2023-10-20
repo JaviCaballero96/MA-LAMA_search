@@ -57,6 +57,7 @@ State::State(istream &in) {
     check_magic(in, "end_state");
 
     g_default_axiom_values = vars;
+    applied_actions = 0;
     g_value = 0;
     g_current_time_value = 0;
     g_time_value = 0;
@@ -121,7 +122,6 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     if (g_use_metric) // if using action costs, all costs have been increased by 1
 		g_value = g_value - 1;
 
-    // TODO cuando no sea temporal y todos los arrays que he metido yo
     float op_duration = 0;
     float op_end_time = 0;
     float op_start_time = new_predecessor.g_current_time_value;
@@ -155,12 +155,12 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 			vector<runn_action>::const_iterator it_ra_const = new_predecessor.running_actions.begin();
 			for(; (it_ra_const != new_predecessor.running_actions.end()) && (op_duration == 0); it_ra_const++){
 				if((*it_ra_const).non_temporal_action_name == new_op.get_non_temporal_action_name()){
-					vector<PrePost>::const_iterator it_fc = (*it_ra_const).functional_costs.begin();
-					for(; (it_fc != new_op.get_pre_post().end()) && (op_duration == 0); ++it_fc) {
-						//PrePost pp = *it_fc;
-						if(g_variable_name[it_fc->var] == total_time_var)
+					vector<PrePost*>::const_iterator it_fc = (*it_ra_const).functional_costs.begin();
+					for(; (it_fc != (*it_ra_const).functional_costs.end()) && (op_duration == 0); ++it_fc) {
+						PrePost* pp = *it_fc;
+						if(g_variable_name[pp->var] == total_time_var)
 						{
-							op_duration = it_fc->f_cost;
+							op_duration = pp->f_cost;
 						}
 					}
 				}
@@ -181,13 +181,21 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 			running_actions.back().time_end = new_predecessor.g_current_time_value + op_duration;
 
 			for(int i = 0; i < new_op.get_pre_post().size(); i++) {
-				PrePost pre_post = new_op.get_pre_post()[i];
+				PrePost* pre_post = new PrePost(new_op.get_pre_post()[i].var,
+						new_op.get_pre_post()[i].pre, new_op.get_pre_post()[i].post,
+						new_op.get_pre_post()[i].f_cost,
+						new_op.get_pre_post()[i].cond);
+				pre_post->have_runtime_cost_effect = new_op.get_pre_post()[i].have_runtime_cost_effect;
+				if(pre_post->have_runtime_cost_effect)
+					pre_post->runtime_cost_effect = new_op.get_pre_post()[i].runtime_cost_effect;
+				else
+					pre_post->runtime_cost_effect = "";
 
-				if((pre_post.pre == -2) || (pre_post.pre == -3) || (pre_post.pre == -4))
+				if((pre_post->pre == -2) || (pre_post->pre == -3) || (pre_post->pre == -4))
 				{
-					if(pre_post.have_runtime_cost_effect)
+					if(pre_post->have_runtime_cost_effect)
 					{
-						pre_post.f_cost = new_predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+						pre_post->f_cost = new_predecessor.calculate_runtime_efect<float>(pre_post->runtime_cost_effect);
 						running_actions.back().functional_costs.push_back(pre_post);
 					} else
 						running_actions.back().functional_costs.push_back(pre_post);
@@ -204,11 +212,10 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 				{
 					op_end_time = (*it_ra).time_end;
 					it_ra = this->running_actions.erase(it_ra);
+					break;
 				}else{
 					it_ra++;
 				}
-
-				break;
 			}
 			g_current_time_value = op_end_time;
 		}
@@ -253,41 +260,12 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 		}
     }
 
-	for(int k = 0; k < external_blocked_vars.size(); k++)
+	// Copy locked variables
+	vector<float>::const_iterator it_f = new_predecessor.numeric_vars_val.begin();
+	for(; it_f != new_predecessor.numeric_vars_val.end(); it_f++)
 	{
-		if(external_blocked_vars[k]->val_pre == -2)
-			continue;
-
-		if((external_blocked_vars[k]->time_set >= new_predecessor.g_current_time_value) &&
-				(external_blocked_vars[k]->time_set < op_end_time))
-		{
-
-			bool action_changes_constraint = false;
-			vector<PrePost>::const_iterator it_pp = new_op.get_pre_post().begin();
-			for(; it_pp != new_op.get_pre_post().end(); ++it_pp) {
-				PrePost pp = *it_pp;
-				if(pp.var == external_blocked_vars[k]->var)
-				{
-					action_changes_constraint = true;
-				}
-			}
-			if(!action_changes_constraint)
-			{
-				const std::vector<Prevail> prevail;
-				PrePost* pre_post = new PrePost(external_blocked_vars[k]->var, external_blocked_vars[k]->val_pre,
-						external_blocked_vars[k]->val_pos, 0, prevail);
-				if(pre_post->does_fire(new_predecessor))
-				{
-					vars[pre_post->var] = pre_post->post;
-					// cout << "external var: " << vars[pre_post->var] << " to " << pre_post->post << endl;
-				}
-				else
-					cout << "something bad happened" << endl;
-				delete pre_post;
-			}
-		}
+		this->numeric_vars_val.push_back(*it_f);
 	}
-
     // Only truly update numeric values if the action is an end action
     for(int i = 0; (i < new_op.get_pre_post().size()) && ((new_op.get_name().find("_end") != string::npos) || (is_temporal)) ; i++) {
 		const PrePost &pre_post = new_op.get_pre_post()[i];
@@ -339,6 +317,38 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     applied_actions_vec.push_back(new_op.get_name());
 }
 
+/* State::State(const State &origin)
+: vars(origin.vars), numeric_vars_val(origin.numeric_vars_val),
+  reached_lms(origin.reached_lms), reached_lms_cost(origin.reached_lms_cost){
+	g_time_value = origin.g_time_value;
+	g_current_time_value = origin.g_current_time_value;
+	g_value = origin.get_g_value();
+
+	applied_actions = origin.applied_actions;
+	for(int i = 0; i < origin.applied_actions_vec.size(); i++)
+	{
+		applied_actions_vec.push_back(origin.applied_actions_vec[i]);
+	}
+
+	running_actions = origin.running_actions;
+	for(int i = 0; i < origin.running_actions.size(); i++)
+	{
+		running_actions.push_back(origin.running_actions[i]);
+	}
+
+	blocked_vars = origin.blocked_vars;
+	for(int i = 0; i < origin.blocked_vars.size(); i++)
+	{
+		blocked_vars.push_back(origin.blocked_vars[i]);
+	}
+
+	just_added_external_const = origin.just_added_external_const;
+	for(int i = 0; i < origin.just_added_external_const.size(); i++)
+	{
+		just_added_external_const.push_back(origin.just_added_external_const[i]);
+	}
+} */
+
 State::State(const State &predecessor, const Operator &op)
     : vars(predecessor.vars), numeric_vars_val(predecessor.numeric_vars_val),
 	  reached_lms(predecessor.reached_lms), reached_lms_cost(predecessor.reached_lms_cost) {
@@ -371,12 +381,12 @@ State::State(const State &predecessor, const Operator &op)
 			vector<runn_action>::const_iterator it_ra_const = predecessor.running_actions.begin();
 			for(; (it_ra_const != predecessor.running_actions.end()) && (op_duration == 0); it_ra_const++){
 				if((*it_ra_const).non_temporal_action_name == op.get_non_temporal_action_name()){
-					vector<PrePost>::const_iterator it_fc = (*it_ra_const).functional_costs.begin();
-					for(; (it_fc != op.get_pre_post().end()) && (op_duration == 0); ++it_fc) {
-						//PrePost pp = *it_fc;
-						if(g_variable_name[it_fc->var] == total_time_var)
+					vector<PrePost*>::const_iterator it_fc = (*it_ra_const).functional_costs.begin();
+					for(; (it_fc != (*it_ra_const).functional_costs.end()) && (op_duration == 0); ++it_fc) {
+						PrePost* pp = *it_fc;
+						if(g_variable_name[pp->var] == total_time_var)
 						{
-							op_duration = it_fc->f_cost;
+							op_duration = pp->f_cost;
 						}
 					}
 				}
@@ -397,13 +407,22 @@ State::State(const State &predecessor, const Operator &op)
 			running_actions.back().time_end = predecessor.g_current_time_value + op_duration;
 
 			for(int i = 0; i < op.get_pre_post().size(); i++) {
-				PrePost pre_post = op.get_pre_post()[i];
+				PrePost* pre_post = new PrePost(op.get_pre_post()[i].var,
+						op.get_pre_post()[i].pre, op.get_pre_post()[i].post,
+						op.get_pre_post()[i].f_cost,
+						op.get_pre_post()[i].cond);
 
-				if((pre_post.pre == -2) || (pre_post.pre == -3) || (pre_post.pre == -4))
+				pre_post->have_runtime_cost_effect = op.get_pre_post()[i].have_runtime_cost_effect;
+				if(pre_post->have_runtime_cost_effect)
+					pre_post->runtime_cost_effect = op.get_pre_post()[i].runtime_cost_effect;
+				else
+					pre_post->runtime_cost_effect = "";
+
+				if((pre_post->pre == -2) || (pre_post->pre == -3) || (pre_post->pre == -4))
 				{
-					if(pre_post.have_runtime_cost_effect)
+					if(pre_post->have_runtime_cost_effect)
 					{
-						pre_post.f_cost = predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+						pre_post->f_cost = predecessor.calculate_runtime_efect<float>(pre_post->runtime_cost_effect);
 						running_actions.back().functional_costs.push_back(pre_post);
 					} else
 						running_actions.back().functional_costs.push_back(pre_post);
@@ -420,11 +439,10 @@ State::State(const State &predecessor, const Operator &op)
 				{
 					op_end_time = (*it_ra).time_end;
 					it_ra = this->running_actions.erase(it_ra);
+					break;
 				}else{
 					it_ra++;
 				}
-
-				break;
 			}
 			g_current_time_value = op_end_time;
 		}
@@ -474,7 +492,7 @@ State::State(const State &predecessor, const Operator &op)
     	g_current_time_value = predecessor.g_current_time_value + 0.01;
     }
 
-	for(int k = 0; k < external_blocked_vars.size(); k++)
+	/* for(int k = 0; k < external_blocked_vars.size(); k++)
 	{
 		if(external_blocked_vars[k]->val_pre == -2)
 			continue;
@@ -507,7 +525,7 @@ State::State(const State &predecessor, const Operator &op)
 				delete pre_post;
 			}
 		}
-	}
+	}*/
 
     // Update values affected by operator.
     for(int i = 0; i < op.get_pre_post().size(); i++) {

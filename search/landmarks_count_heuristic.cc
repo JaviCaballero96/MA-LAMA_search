@@ -52,9 +52,9 @@ void LandmarksCountHeuristic::set_recompute_heuristic(const State &state) {
         assert(ff_heuristic != 0);
         // Set additional goals for FF exploration
         vector<pair<int, int> > lm_leaves;
-	hash_set<const LandmarkNode*, hash_pointer> result;
-	state.check_partial_plan(result);
-	collect_lm_leaves(ff_search_disjunctive_lms, result, lm_leaves);
+        hash_set<const LandmarkNode*, hash_pointer> result;
+        state.check_partial_plan(result);
+        collect_lm_leaves(ff_search_disjunctive_lms, result, lm_leaves);
         ff_heuristic->set_additional_goals(lm_leaves);
     }
 }

@@ -193,13 +193,13 @@ void FFHeuristic::setup_exploration_queue(const State &state,
     reachable_queue.clear();
 
     for(int var = 0; var < propositions.size(); var++) {
-	for(int value = 0; value < propositions[var].size(); value++) {
-	    Proposition &prop = propositions[var][value];
-	    prop.h_add_cost = -1;
-	    prop.h_max_cost = -1;
-	    prop.depth = -1;
-	    prop.marked = false;
-	}
+		for(int value = 0; value < propositions[var].size(); value++) {
+			Proposition &prop = propositions[var][value];
+			prop.h_add_cost = -1;
+			prop.h_max_cost = -1;
+			prop.depth = -1;
+			prop.marked = false;
+		}
     }
     if(excluded_props.size() > 0) {
 	for(unsigned i = 0; i < excluded_props.size(); i++) {
@@ -210,10 +210,10 @@ void FFHeuristic::setup_exploration_queue(const State &state,
 
     // Deal with current state.
     for(int var = 0; var < propositions.size(); var++) {
-    if (state[var] != -1){
-    	Proposition *init_prop = &propositions[var][state[var]];
-    	enqueue_if_necessary(init_prop, 0, 0, 0, use_h_max);
-    }
+		if (state[var] != -1){
+			Proposition *init_prop = &propositions[var][state[var]];
+			enqueue_if_necessary(init_prop, 0, 0, 0, use_h_max);
+		}
     }
 
     // Initialize operator data, deal with precondition-free operators/axioms.
@@ -249,38 +249,38 @@ void FFHeuristic::relaxed_exploration(bool use_h_max = false, bool level_out = f
                 break;
             Proposition *prop = bucket.back();
             bucket.pop_back();
-	    int prop_cost;
-	    if(use_h_max)
-		prop_cost = prop->h_max_cost;
-	    else
-		prop_cost = prop->h_add_cost;
-	    assert(prop_cost <= distance);
-	    if(prop_cost < distance)
-		continue;
-	    if(!level_out && prop->is_termination_condition && --unsolved_goals == 0)
+            int prop_cost;
+            if(use_h_max)
+            	prop_cost = prop->h_max_cost;
+            else
+            	prop_cost = prop->h_add_cost;
+            assert(prop_cost <= distance);
+            if(prop_cost < distance)
+            	continue;
+            if(!level_out && prop->is_termination_condition && --unsolved_goals == 0)
                 return;
-	    const vector<UnaryOperator *> &triggered_operators = prop->precondition_of;
-	    for(int i = 0; i < triggered_operators.size(); i++) {
-		UnaryOperator *unary_op = triggered_operators[i];
-		if(unary_op->h_add_cost == -2) // operator is not applied
-		    continue;
-		unary_op->unsatisfied_preconditions--;
-		unary_op->h_add_cost += prop_cost;
-		unary_op->h_max_cost = max(prop_cost + unary_op->base_cost, 
-					   unary_op->h_max_cost);
-		unary_op->depth = max(unary_op->depth, prop->depth);
-		assert(unary_op->unsatisfied_preconditions >= 0);
-		if(unary_op->unsatisfied_preconditions == 0) {
-		    int depth = unary_op->op->is_axiom() ? unary_op->depth : unary_op->depth + 1;
-		    if(use_h_max)
-			enqueue_if_necessary(unary_op->effect, unary_op->h_max_cost,
+            const vector<UnaryOperator *> &triggered_operators = prop->precondition_of;
+            for(int i = 0; i < triggered_operators.size(); i++) {
+            	UnaryOperator *unary_op = triggered_operators[i];
+            	if(unary_op->h_add_cost == -2) // operator is not applied
+            		continue;
+            	unary_op->unsatisfied_preconditions--;
+            	unary_op->h_add_cost += prop_cost;
+            	unary_op->h_max_cost = max(prop_cost + unary_op->base_cost,
+				unary_op->h_max_cost);
+            	unary_op->depth = max(unary_op->depth, prop->depth);
+            	assert(unary_op->unsatisfied_preconditions >= 0);
+            	if(unary_op->unsatisfied_preconditions == 0) {
+            		int depth = unary_op->op->is_axiom() ? unary_op->depth : unary_op->depth + 1;
+            		if(use_h_max)
+            			enqueue_if_necessary(unary_op->effect, unary_op->h_max_cost,
 					     depth, unary_op, use_h_max);
-		    else
-			enqueue_if_necessary(unary_op->effect, unary_op->h_add_cost,
+            		else
+            			enqueue_if_necessary(unary_op->effect, unary_op->h_add_cost,
 					     depth, unary_op, use_h_max);
-		}
-	    }
-	}
+            	}
+            }
+        }
     }
 }
 
@@ -461,7 +461,7 @@ void FFHeuristic::prepare_heuristic_computation(const State& state, bool h_max =
 
 int FFHeuristic::compute_heuristic(const State &state) {
     if(heuristic_recomputation_needed) {
-	prepare_heuristic_computation(state);
+    	prepare_heuristic_computation(state);
     }
     return compute_ff_heuristic(state);
 }

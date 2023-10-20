@@ -51,7 +51,7 @@ typedef struct{
 	float time_start;
 	float time_end;
 	string non_temporal_action_name;
-	vector<PrePost> functional_costs;
+	vector<PrePost*> functional_costs;
 } runn_action;
 
 class State {
@@ -76,6 +76,7 @@ public:
     vector<float> numeric_vars_val;
     vector<string> applied_actions_vec;
     State(istream &in);
+    // State(const State &origin);
     State(const State &predecessor, const Operator &op);
     int &operator[](int index) {
 	return vars[index];
@@ -92,6 +93,8 @@ public:
     float get_g_value() const {return g_value;}
     float get_g_time_value() const {return g_time_value;}
     float get_g_current_time_value() const {return g_current_time_value;}
+    void  set_g_time_value(float time) {g_time_value = time;}
+    void  set_g_current_time_value(float time) {g_current_time_value = time;}
     void change_ancestor(const State &new_predecessor, const Operator &new_op);
     vector<int> get_vars_state(){return vars;};
     vector<float> get_num_vars_state(){return numeric_vars_val;};
