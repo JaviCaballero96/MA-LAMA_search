@@ -23,6 +23,7 @@
 #define SEARCH_ENGINE_H
 
 #include <vector>
+#include "state.h"
 
 class Operator;
 
@@ -38,6 +39,7 @@ private:
     vector<float> plan_cost_info;
     vector<int> vars_end_state;
     vector<float> num_vars_end_state;
+    vector<vector<blocked_var> > blocked_vars_info;
 protected:
     enum {FAILED, SOLVED, IN_PROGRESS};
     virtual void initialize() {}
@@ -59,10 +61,12 @@ public:
     vector<float>  get_plan_temporal_info(){return plan_tamporal_info;};
     void set_plan_cost_info(vector<float> plan_temp){plan_cost_info = plan_temp;};
     void set_vars_end_state(vector<int> vars_state){vars_end_state = vars_state;}
+    void set_blocked_vars_info(vector<vector<blocked_var> > blocked_vars) {blocked_vars_info = blocked_vars;}
     void set_num_vars_end_state(vector<float> num_vars_state){num_vars_end_state = num_vars_state;}
 	vector<float> get_plan_cost_info(){return plan_cost_info;};
     vector<int> get_end_state(){return vars_end_state;};
     vector<float> get_num_end_state(){return num_vars_end_state;};
+    vector<vector<blocked_var> > get_blocked_vars_info(){return blocked_vars_info;};
 };
 
 #endif

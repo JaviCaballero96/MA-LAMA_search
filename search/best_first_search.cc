@@ -162,12 +162,18 @@ bool BestFirstSearchEngine::check_goal() {
 	{
 		plan_cost_info.push_back(states_plan[i].get_g_value());
 	}
+	vector<vector<blocked_var> > plan_blocked_vars_info;
+	for(int i = 1; i < states_plan.size(); i++)
+	{
+		plan_blocked_vars_info.push_back(states_plan[i].blocked_vars);
+	}
 	set_plan_cost(current_state.get_g_value());
 	set_plan_temporal_info(plan_temporal_info);
 	set_plan_duration_info(plan_duration_info);
 	set_plan_cost_info(plan_cost_info);
 	set_vars_end_state(states_plan[states_plan.size() - 1].get_vars_state());
 	set_num_vars_end_state(states_plan[states_plan.size() - 1].get_num_vars_state());
+	set_blocked_vars_info(plan_blocked_vars_info);
 
 	set_plan(plan);
 	return true;
@@ -225,7 +231,7 @@ void BestFirstSearchEngine::generate_successors(const State *parent_ptr) {
 		check_var_locks_validity(current_state, all_operators);
 		check_temporal_soundness_validity(current_state, all_operators);
     }
-    // heck_external_locks_validity(current_state, all_operators);
+    check_external_locks_validity(current_state, all_operators);
 
     vector<const Operator *> preferred_operators;
     for(int i = 0; i < preferred_operator_heuristics.size(); i++) {
@@ -238,7 +244,7 @@ void BestFirstSearchEngine::generate_successors(const State *parent_ptr) {
 		check_var_locks_validity(current_state, preferred_operators);
 		check_temporal_soundness_validity(current_state, preferred_operators);
     }
-    // check_external_locks_validity(current_state, preferred_operators);
+    check_external_locks_validity(current_state, preferred_operators);
 
     if(parent_ptr->running_actions.size() > 1)
     {

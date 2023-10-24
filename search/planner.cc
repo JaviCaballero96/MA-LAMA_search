@@ -45,10 +45,11 @@
 
 using namespace std;
 
+bool use_hard_temporal_constraints = false;
 
 float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
 		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info, vector<float> plan_cost_info,
-		vector<int> vars_end_state, vector<float> num_vars_end_state);
+		vector<int> vars_end_state, vector<float> num_vars_end_state, vector<vector<blocked_var> > blocked_vars_info);
 void print_previous_constraints(ofstream& constraints_outfile);
 void print_vars_end_state(ofstream& state_outfile, vector<int> vars_end_state, vector<float> num_vars_end_state);
 
@@ -95,9 +96,11 @@ int main(int argc, const char **argv) {
 	    	read_runtime_constraints = true;
 	    } else if(*c == 's'){
 	    	read_init_state = true;
+	    } else if(*c == 'h'){
+	    	use_hard_temporal_constraints = true;
 	    } else {
-		cerr << "Unknown option: " << *c << endl;
-		return 1;
+			cerr << "Unknown option: " << *c << endl;
+			return 1;
 	    }
 	}
 	if(argc == 3)
@@ -204,7 +207,7 @@ int main(int argc, const char **argv) {
 	if(engine->found_solution())
 	    plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no,
 	    		engine->get_plan_temporal_info(), engine->get_plan_duration_info(), engine->get_plan_cost_info(),
-				engine->get_end_state(), engine->get_num_end_state());
+				engine->get_end_state(), engine->get_num_end_state(), engine->get_blocked_vars_info());
 
 	engine->statistics();
 
@@ -240,7 +243,8 @@ int main(int argc, const char **argv) {
 
 float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
 		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info,
-		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state) {
+		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state,
+		vector<vector<blocked_var> > blocked_vars_info) {
     ofstream outfile;
     string state_outfile_name = "end_state";
     ofstream state_outfile;
@@ -282,9 +286,9 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 			 << action_cost << ")" << endl;
 
 		/* Check if sharerd vars have been modified */
-		string shared_str = "(";
 		const std::vector<Prevail> prevail = plan[i]->get_prevail();
 		const std::vector<PrePost> prepost = plan[i]->get_pre_post();
+		const std::vector<PrePost> preblock = plan[i]->get_pre_block();
 
 		/* Check constraints as prevail */
 		for(int j = 0; j < prevail.size(); j++)
@@ -300,6 +304,8 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 
 		    	if(shared_number_2 == var)
 		    	{
+		    		float block_var_duration = 0.01;
+		    		string shared_str = "(";
 		    		stringstream ss1, ss2;
 		    		string aux1, aux2;
 		    		ss1.str("");
@@ -308,7 +314,18 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		    		ss2.str("");
 		    		ss2 << prev;
 		    		ss2 >> aux2;
-		    		shared_str = shared_str + "0 " + aux1 + " " + aux2 + " | ";
+		    		shared_str = shared_str + "0 " + aux1 + " " + aux2 + ")";
+
+		    		if(plan[i]->get_name().find("_start") != string::npos) {
+						/*for(int k = 0; k < blocked_vars_info[i].size(); k++) {
+							if((blocked_vars_info[i][k].var == var) && (blocked_vars_info[i][k].time_set == action_init_time)) {
+								block_var_duration = blocked_vars_info[i][k].time_freed - action_init_time;
+							}
+						}*/
+						constraints_outfile << action_init_time << " " << (action_init_time + action_duration_time - 0.01) << " " << shared_str << endl;
+					} else {
+						constraints_outfile << action_init_time << " " << (action_init_time + block_var_duration) << " " << shared_str << endl;
+					}
 		    	}
 		    }
 		}
@@ -330,6 +347,8 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 
 		    	if(shared_number_2 == var)
 		    	{
+		    		string shared_str = "(";
+		    		float block_var_duration = 0.01;
 		    		stringstream ss1, ss2, ss3;
 		    		string aux1, aux2, aux3;
 		    		ss1.str("");
@@ -341,21 +360,25 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		    		ss3.str("");
 		    		ss3 << post;
 		    		ss3 >> aux3;
-		    		shared_str = shared_str + "1 " + aux1 + " " + aux2 + " " + aux3 + " | ";
+		    		shared_str = shared_str + "1 " + aux1 + " " + aux2 + " " + aux3 + ")";
+
+					if(plan[i]->get_name().find("_start") != string::npos) {
+						/* for(int k = 0; k < blocked_vars_info[i].size(); k++) {
+							if((blocked_vars_info[i][k].var == var) && (blocked_vars_info[i][k].time_set == action_init_time)) {
+								block_var_duration = blocked_vars_info[i][k].time_freed - action_init_time;
+							}
+						} */
+						constraints_outfile << action_init_time << " " << (action_init_time + action_duration_time - 0.01) << " " << shared_str << endl;
+					} else {
+						constraints_outfile << action_init_time << " " << (action_init_time + block_var_duration) << " " << shared_str << endl;
+					}
 		    	}
 		    }
 		}
 
-		if(shared_str == "(")
-		{
-			outfile << action_duration_time << " " << "(" << plan[i]->get_name() << ") " << action_cost << endl;
-		}else
-		{
-			shared_str = shared_str.substr(0, shared_str.size() - 3);
-			shared_str = shared_str + ")";
-			outfile << action_duration_time << " " << "(" << plan[i]->get_name() << ") " << action_cost << endl;
-			constraints_outfile << action_init_time << " " << action_duration_time << " " << shared_str << endl;
-		}
+		outfile << action_duration_time << " " << action_init_time << " " << "(" << plan[i]->get_name() << ") " << action_cost << endl;
+		// constraints_outfile << action_init_time << " " << (action_init_time + block_var_duration) << " " << shared_str << endl;
+
 
     }
     outfile << "Cost: " <<  plan_cost << endl;
@@ -377,54 +400,97 @@ void print_previous_constraints(ofstream& constraints_outfile)
 {
 	for(int i = 0; i < external_blocked_vars.size(); i++)
 	{
-		for(int z = 0; z < g_shared_vars.size(); z++)
+		if(external_blocked_vars[i]->in_current_agent)
 		{
-			int shared_number_1 = atoi((g_shared_vars[z].first.substr(3, g_shared_vars[z].first.length())).c_str());
-			int shared_number_2 = g_shared_vars[z].second;
-
-			if(shared_number_2 == external_blocked_vars[i]->var)
+			for(int z = 0; z < g_shared_vars.size(); z++)
 			{
-				string shared_str = "";
+				int shared_number_1 = atoi((g_shared_vars[z].first.substr(3, g_shared_vars[z].first.length())).c_str());
+				int shared_number_2 = g_shared_vars[z].second;
 
-				if(external_blocked_vars[i]->val_pre != -2)
+				if(shared_number_2 == external_blocked_vars[i]->var)
 				{
-					std::stringstream ss1;
-					ss1 << external_blocked_vars[i]->time_set;
-					string time_set = ss1.str();
-					ss1.str("");
-					ss1 << external_blocked_vars[i]->duration;
-					string duration = ss1.str();
-					ss1.str("");
-					ss1 << shared_number_1;
-					string shared_number = ss1.str();
-					ss1.str("");
-					ss1 << external_blocked_vars[i]->val_pre;
-					string val_pre = ss1.str();
-					ss1.str("");
-					ss1 << external_blocked_vars[i]->val_pos;
-					string val_pos = ss1.str();
-					ss1.str("");
-					shared_str = time_set + " " + duration + "(1 " + " " + shared_number + " " + val_pre + " " + val_pos + ")";
-				} else {
-					std::stringstream ss1;
-					ss1 << external_blocked_vars[i]->time_set;
-					string time_set = ss1.str();
-					ss1.str("");
-					ss1 << external_blocked_vars[i]->duration;
-					string duration = ss1.str();
-					ss1.str("");
-					ss1 << shared_number_1;
-					string shared_number = ss1.str();
-					ss1.str("");
-					ss1 << external_blocked_vars[i]->val_pos;
-					string val_pos = ss1.str();
-					ss1.str("");
-					shared_str = time_set + " " + duration + "(0 " + " " + shared_number + " " + val_pos + ")";
-				}
+					string shared_str = "";
 
-				constraints_outfile << shared_str << endl;
-				break;
+					if(external_blocked_vars[i]->val_pre != -2)
+					{
+						std::stringstream ss1;
+						ss1 << external_blocked_vars[i]->time_set;
+						string time_set = ss1.str();
+						ss1.str("");
+						ss1 << external_blocked_vars[i]->duration;
+						string duration = ss1.str();
+						ss1.str("");
+						ss1 << shared_number_1;
+						string shared_number = ss1.str();
+						ss1.str("");
+						ss1 << external_blocked_vars[i]->val_pre;
+						string val_pre = ss1.str();
+						ss1.str("");
+						ss1 << external_blocked_vars[i]->val_pos;
+						string val_pos = ss1.str();
+						ss1.str("");
+						shared_str = time_set + " " + duration + " (1 " + " " + shared_number + " " + val_pre + " " + val_pos + ")";
+					} else {
+						std::stringstream ss1;
+						ss1 << external_blocked_vars[i]->time_set;
+						string time_set = ss1.str();
+						ss1.str("");
+						ss1 << external_blocked_vars[i]->duration;
+						string duration = ss1.str();
+						ss1.str("");
+						ss1 << shared_number_1;
+						string shared_number = ss1.str();
+						ss1.str("");
+						ss1 << external_blocked_vars[i]->val_pos;
+						string val_pos = ss1.str();
+						ss1.str("");
+						shared_str = time_set + " " + duration + " (0 " + " " + shared_number + " " + val_pos + ")";
+					}
+
+					constraints_outfile << shared_str << endl;
+					break;
+				}
 			}
+		} else {
+			string shared_str = "";
+
+			if(external_blocked_vars[i]->val_pre != -2)
+			{
+				std::stringstream ss1;
+				ss1 << external_blocked_vars[i]->time_set;
+				string time_set = ss1.str();
+				ss1.str("");
+				ss1 << external_blocked_vars[i]->duration;
+				string duration = ss1.str();
+				ss1.str("");
+				ss1 << external_blocked_vars[i]->var;
+				string shared_number = ss1.str();
+				ss1.str("");
+				ss1 << external_blocked_vars[i]->val_pre;
+				string val_pre = ss1.str();
+				ss1.str("");
+				ss1 << external_blocked_vars[i]->val_pos;
+				string val_pos = ss1.str();
+				ss1.str("");
+				shared_str = time_set + " " + duration + " (1 " + " " + shared_number + " " + val_pre + " " + val_pos + ")";
+			} else {
+				std::stringstream ss1;
+				ss1 << external_blocked_vars[i]->time_set;
+				string time_set = ss1.str();
+				ss1.str("");
+				ss1 << external_blocked_vars[i]->duration;
+				string duration = ss1.str();
+				ss1.str("");
+				ss1 << external_blocked_vars[i]->var;
+				string shared_number = ss1.str();
+				ss1.str("");
+				ss1 << external_blocked_vars[i]->val_pos;
+				string val_pos = ss1.str();
+				ss1.str("");
+				shared_str = time_set + " " + duration + " (0 " + " " + shared_number + " " + val_pos + ")";
+			}
+
+			constraints_outfile << shared_str << endl;
 		}
 	}
 }

@@ -218,7 +218,7 @@ void read_runtime_contraints()
 		in >> act_duration;
 
 		ext_constraint* bv = new(ext_constraint);
-		bv->effect_applied = false;
+		bv->in_current_agent = false;
 		bv->time_set = time_init;
 		bv->duration = act_duration;
 		bool remaining_constraints = true;
@@ -243,11 +243,12 @@ void read_runtime_contraints()
 			    	if(shared_number_1 == i_aux)
 			    	{
 			    		var_found = true;
+			    		bv->in_current_agent = true;
 			    		i_aux = shared_number_2;
 			    		break;
 			    	}
 			    }
-			    if(!var_found)
+			    /* if(!var_found)
 				{
 			    	in >> i_aux;
 			    	in >> s_aux;
@@ -261,7 +262,7 @@ void read_runtime_contraints()
 						assert(s_aux == "|");
 					}
 					continue;
-				}
+				} */
 				bv->var = i_aux;
 				in >> i_aux;
 				bv->val_pre = i_aux;
@@ -278,9 +279,7 @@ void read_runtime_contraints()
 
 			} else
 			{
-				bv->effect_applied  = true;
 				int i_aux = 0;
-				in >> i_aux;
 				in >> i_aux;
 				bool var_found = false;
 			    for(int z = 0; z < g_shared_vars.size(); z++)
@@ -291,11 +290,12 @@ void read_runtime_contraints()
 			    	if(shared_number_1 == i_aux)
 			    	{
 			    		var_found = true;
+			    		bv->in_current_agent  = true;
 			    		i_aux = shared_number_2;
 			    		break;
 			    	}
 			    }
-			    if(!var_found)
+			    /* if(!var_found)
 				{
 			    	in >> s_aux;
 					if(s_aux.find(")") != string::npos) {
@@ -308,7 +308,7 @@ void read_runtime_contraints()
 						assert(s_aux == "|");
 					}
 					continue;
-				}
+				} */
 				bv->var = i_aux;
 				bv->val_pre = -2;
 				in >> s_aux;
@@ -324,9 +324,79 @@ void read_runtime_contraints()
 			}
 			external_blocked_vars.push_back(bv);
 		}
-
 	}
 	check_magic(in, "end_constraints");
+
+	process_shared_vars_values();
+}
+
+void process_shared_vars_values()
+{
+	for(int i = 0; i < g_shared_vars.size(); i ++)
+	{
+		pair<int, vector<pair<int, float>* >* >* shared_var_pair_list = new pair<int, vector<pair<int, float>* >* >();
+
+		shared_var_pair_list->first = g_shared_vars[i].second;
+
+		vector<pair<int, float>* > *var_timed_values = new vector<pair<int, float>* >();
+
+		pair<int, float> *first_value = new pair<int, float>();
+		first_value->first = int(-1);
+		first_value->second = float(0.00);
+		var_timed_values->push_back(first_value);
+
+		int min_index = -1;
+		float curr_time_value = 0;
+		bool min_found = false;
+		int last_added_val = -2;
+		do{
+			min_found = false;
+			float min_time = 999999;
+			for(int j = 0; j < external_blocked_vars.size(); j++)
+			{
+				if((external_blocked_vars[j]->in_current_agent) && (external_blocked_vars[j]->var == g_shared_vars[i].second))
+				{
+					if((min_index == -1) || ((curr_time_value < external_blocked_vars[j]->time_set) && (min_time > external_blocked_vars[j]->time_set))){
+						min_index = j;
+						min_found = true;
+						min_time = external_blocked_vars[j]->time_set;
+					}
+				}
+			}
+
+			if((min_index != -1) && min_found)
+			{
+				if(last_added_val != external_blocked_vars[min_index]->val_pos)
+				{
+					last_added_val = external_blocked_vars[min_index]->val_pos;
+					pair<int, float> *timed_value = new pair<int, float>();
+					timed_value->first = external_blocked_vars[min_index]->val_pos;
+					timed_value->second = external_blocked_vars[min_index]->time_set;
+
+					var_timed_values->push_back(timed_value);
+					curr_time_value = external_blocked_vars[min_index]->time_set;
+				}else{
+					curr_time_value = external_blocked_vars[min_index]->time_set;
+				}
+			}
+
+		} while(min_found);
+
+
+		shared_var_pair_list->second = var_timed_values;
+		g_shared_vars_timed_values.push_back(shared_var_pair_list);
+	}
+
+
+	for(int k = 0; k < g_shared_vars_timed_values.size(); k++)
+	{
+		cout << "States for shared var: " <<  g_shared_vars_timed_values[k]->first << endl;
+		for(int j = 0; j < g_shared_vars_timed_values[k]->second->size(); j++)
+		{
+			cout << "--- " << (*(g_shared_vars_timed_values[k]->second))[j]->first <<
+					" // " << (*(g_shared_vars_timed_values[k]->second))[j]->second << endl;
+		}
+	}
 }
 
 void read_ext_init_state()
@@ -392,6 +462,7 @@ State *g_initial_state;
 vector<ext_constraint*> external_blocked_vars;
 vector<pair<int, int> > g_goal;
 vector<pair<string, int> > g_shared_vars;
+vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
 vector<Operator> g_operators;
 vector<Operator> g_axioms;
 AxiomEvaluator *g_axiom_evaluator;

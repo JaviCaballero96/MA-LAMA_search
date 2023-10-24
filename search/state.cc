@@ -122,15 +122,60 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     if (g_use_metric) // if using action costs, all costs have been increased by 1
 		g_value = g_value - 1;
 
-    float op_duration = 0;
-    float op_end_time = 0;
-    float op_start_time = new_predecessor.g_current_time_value;
+	float op_duration = 0;
+	float op_end_time = 0;
+	float op_start_time = new_predecessor.g_current_time_value;
     if(!is_temporal)
     {
-    	op_duration = 0.01;
+    	op_end_time = op_start_time + 0.01;
     	g_time_value = 0.01;
-    	g_current_time_value = new_predecessor.g_current_time_value + 0.01;
-    }else {
+    	g_current_time_value = op_start_time + 0.01;
+
+		if(use_hard_temporal_constraints)
+		{
+	    	// Check if the time has to be updated because of external constraints
+			for(int k = 0; k < g_shared_vars_timed_values.size(); k++)
+			{
+				vector<PrePost>::const_iterator it_pp = new_op.get_pre_post().begin();
+				for(; it_pp != new_op.get_pre_post().end(); ++it_pp)
+				{
+					PrePost pp = *it_pp;
+					if(pp.var == g_shared_vars_timed_values[k]->first)
+					{
+						// Search constraint value at that time
+						for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
+						{
+							if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+									(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+							{
+								if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
+										(pp.pre != -1) &&
+										((*(g_shared_vars_timed_values[k]->second))[j]->first != -1)
+								  )
+								{
+									// Set the new time value to a time window when the action can be executed
+									float new_time = get_new_time_window(new_op, this, op_duration, *(g_shared_vars_timed_values[k]->second), pp.pre);
+									g_current_time_value = new_time;
+									op_start_time = new_time;
+									op_end_time = g_current_time_value + 0.01;
+									break;
+								} else if(op_duration > (((*(g_shared_vars_timed_values[k]->second))[j + 1]->second) - (this->get_g_current_time_value())))
+								{
+									// Set the new time value to a time window when the action can be executed
+									float new_time = get_new_time_window(new_op, this, op_duration, *(g_shared_vars_timed_values[k]->second), pp.pre);
+									g_current_time_value = new_time;
+									op_start_time = new_time;
+									op_end_time = g_current_time_value + 0.01;
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+    } else {
 
 		// Get action duration
 		if(new_op.get_name().find("_start") != string::npos){
@@ -150,7 +195,7 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 					break;
 				}
 			}
-		}else{
+		} else{
 			// Get the duration from the running action
 			vector<runn_action>::const_iterator it_ra_const = new_predecessor.running_actions.begin();
 			for(; (it_ra_const != new_predecessor.running_actions.end()) && (op_duration == 0); it_ra_const++){
@@ -167,6 +212,72 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 			}
 		}
 
+		op_end_time = new_predecessor.get_g_current_time_value() + 0.01;
+		if(new_op.get_name().find("_end") != string::npos)
+		{
+			vector<runn_action>::const_iterator it_ra = new_predecessor.running_actions.begin();
+			for(; it_ra != new_predecessor.running_actions.end();)
+			{
+				if((*it_ra).non_temporal_action_name == new_op.get_non_temporal_action_name())
+				{
+					op_end_time = (*it_ra).time_end;
+				}else{
+					it_ra++;
+				}
+
+				break;
+			}
+		}
+
+		g_current_time_value = op_end_time;
+		if(use_hard_temporal_constraints)
+		{
+			// Check if the time has to be updated because of external constraints
+			for(int k = 0; k < g_shared_vars_timed_values.size(); k++)
+			{
+				vector<PrePost>::const_iterator it_pp = new_op.get_pre_post().begin();
+				for(; it_pp != new_op.get_pre_post().end(); ++it_pp)
+				{
+					PrePost pp = *it_pp;
+					if(pp.var == g_shared_vars_timed_values[k]->first)
+					{
+						// Search constraint value at that time
+						for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
+						{
+							if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+									(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+							{
+								if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
+										(pp.pre != -1) &&
+										((*(g_shared_vars_timed_values[k]->second))[j]->first != -1)
+								  )
+								{
+									if ((new_op.get_name().find("_start") != string::npos) && (new_predecessor.running_actions.size() == 0)){
+										// Set the new time value to a time window when the action can be executed
+										float new_time = get_new_time_window(new_op, this, op_duration, *(g_shared_vars_timed_values[k]->second), pp.pre);
+										g_current_time_value = new_time;
+										op_start_time = new_time;
+										op_end_time = g_current_time_value + 0.01;
+										break;
+									}
+								} else if(op_duration > (((*(g_shared_vars_timed_values[k]->second))[j + 1]->second) - (this->get_g_current_time_value())))
+								{
+									if ((new_op.get_name().find("_start") != string::npos) && (new_predecessor.running_actions.size() == 0)){
+										// Set the new time value to a time window when the action can be executed
+										float new_time = get_new_time_window(new_op, this, op_duration, *(g_shared_vars_timed_values[k]->second), pp.pre);
+										g_current_time_value = new_time;
+										op_start_time = new_time;
+										op_end_time = g_current_time_value + 0.01;
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		vector<runn_action>::const_iterator it_ra_const = new_predecessor.running_actions.begin();
 		for(; it_ra_const != new_predecessor.running_actions.end(); it_ra_const++)
 		{
@@ -177,8 +288,8 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 		if(new_op.get_name().find("_start") != string::npos){
 			running_actions.push_back(*(new(runn_action)));
 			running_actions.back().non_temporal_action_name = new_op.get_non_temporal_action_name();
-			running_actions.back().time_start = new_predecessor.g_current_time_value;
-			running_actions.back().time_end = new_predecessor.g_current_time_value + op_duration;
+			running_actions.back().time_start = op_start_time;
+			running_actions.back().time_end = op_start_time + op_duration;
 
 			for(int i = 0; i < new_op.get_pre_post().size(); i++) {
 				PrePost* pre_post = new PrePost(new_op.get_pre_post()[i].var,
@@ -201,8 +312,6 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 						running_actions.back().functional_costs.push_back(pre_post);
 				}
 			}
-			op_end_time = new_predecessor.g_current_time_value + 0.01;
-			g_current_time_value = new_predecessor.g_current_time_value + 0.01;
 
 		} else {
 			vector<runn_action>::iterator it_ra = this->running_actions.begin();
@@ -210,14 +319,12 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 			{
 				if((*it_ra).non_temporal_action_name == new_op.get_non_temporal_action_name())
 				{
-					op_end_time = (*it_ra).time_end;
 					it_ra = this->running_actions.erase(it_ra);
 					break;
 				}else{
 					it_ra++;
 				}
 			}
-			g_current_time_value = op_end_time;
 		}
 
 		// Copy locked variables
@@ -238,8 +345,8 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 				new_block->var = it_pb-> var;
 				new_block->val = it_pb->post;
 				new_block->block_type = it_pb->pre;
-				new_block->time_set = new_predecessor.g_current_time_value;
-				new_block->time_freed = new_predecessor.g_current_time_value + op_duration;
+				new_block->time_set = op_start_time;
+				new_block->time_freed = op_start_time + op_duration;
 				new_block->non_temporal_action_name = new_op.get_non_temporal_action_name();
 
 				blocked_vars.push_back(*new_block);
@@ -393,6 +500,73 @@ State::State(const State &predecessor, const Operator &op)
 			}
 		}
 
+
+		op_end_time = predecessor.get_g_current_time_value() + 0.01;
+		if(op.get_name().find("_end") != string::npos)
+		{
+			vector<runn_action>::const_iterator it_ra = predecessor.running_actions.begin();
+			for(; it_ra != predecessor.running_actions.end();)
+			{
+				if((*it_ra).non_temporal_action_name == op.get_non_temporal_action_name())
+				{
+					op_end_time = (*it_ra).time_end;
+				}else{
+					it_ra++;
+				}
+
+				break;
+			}
+		}
+
+		g_current_time_value = op_end_time;
+		// Check if the time has to be updated because of external constraints
+		if(use_hard_temporal_constraints)
+		{
+			for(int k = 0; k < g_shared_vars_timed_values.size(); k++)
+			{
+				vector<PrePost>::const_iterator it_pp = op.get_pre_post().begin();
+				for(; it_pp != op.get_pre_post().end(); ++it_pp)
+				{
+					PrePost pp = *it_pp;
+					if(pp.var == g_shared_vars_timed_values[k]->first)
+					{
+						// Search constraint value at that time
+						for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
+						{
+							if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+									(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+							{
+								if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
+										(pp.pre != -1) &&
+										((*(g_shared_vars_timed_values[k]->second))[j]->first != -1)
+								  )
+								{
+									if ((op.get_name().find("_start") != string::npos) && (predecessor.running_actions.size() == 0)){
+										// Set the new time value to a time window when the action can be executed
+										float new_time = get_new_time_window(op, this, op_duration, *(g_shared_vars_timed_values[k]->second), pp.pre);
+										g_current_time_value = new_time;
+										op_start_time = new_time;
+										op_end_time = g_current_time_value + 0.01;
+										break;
+									}
+								} else if(op_duration > (((*(g_shared_vars_timed_values[k]->second))[j + 1]->second) - (this->get_g_current_time_value())))
+								{
+									if ((op.get_name().find("_start") != string::npos) && (predecessor.running_actions.size() == 0)){
+										// Set the new time value to a time window when the action can be executed
+										float new_time = get_new_time_window(op, this, op_duration, *(g_shared_vars_timed_values[k]->second), pp.pre);
+										g_current_time_value = new_time;
+										op_start_time = new_time;
+										op_end_time = g_current_time_value + 0.01;
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		vector<runn_action>::const_iterator it_ra_const = predecessor.running_actions.begin();
 		for(; it_ra_const != predecessor.running_actions.end(); it_ra_const++)
 		{
@@ -400,11 +574,12 @@ State::State(const State &predecessor, const Operator &op)
 		}
 
 		g_time_value = op_duration;
-		if(op.get_name().find("_start") != string::npos){
+		if(op.get_name().find("_start") != string::npos)
+		{
 			running_actions.push_back(*(new(runn_action)));
 			running_actions.back().non_temporal_action_name = op.get_non_temporal_action_name();
-			running_actions.back().time_start = predecessor.g_current_time_value;
-			running_actions.back().time_end = predecessor.g_current_time_value + op_duration;
+			running_actions.back().time_start = op_start_time;
+			running_actions.back().time_end = op_start_time + op_duration;
 
 			for(int i = 0; i < op.get_pre_post().size(); i++) {
 				PrePost* pre_post = new PrePost(op.get_pre_post()[i].var,
@@ -428,23 +603,18 @@ State::State(const State &predecessor, const Operator &op)
 						running_actions.back().functional_costs.push_back(pre_post);
 				}
 			}
-			op_end_time = predecessor.g_current_time_value + 0.01;
-			g_current_time_value = predecessor.g_current_time_value + 0.01;
-
 		} else {
 			vector<runn_action>::iterator it_ra = this->running_actions.begin();
 			for(; it_ra != this->running_actions.end();)
 			{
 				if((*it_ra).non_temporal_action_name == op.get_non_temporal_action_name())
 				{
-					op_end_time = (*it_ra).time_end;
 					it_ra = this->running_actions.erase(it_ra);
 					break;
 				}else{
 					it_ra++;
 				}
 			}
-			g_current_time_value = op_end_time;
 		}
 
 		// Copy locked variables
@@ -465,8 +635,8 @@ State::State(const State &predecessor, const Operator &op)
 				new_block->var = it_pb-> var;
 				new_block->val = it_pb->post;
 				new_block->block_type = it_pb->pre;
-				new_block->time_set = predecessor.g_current_time_value;
-				new_block->time_freed = predecessor.g_current_time_value + op_duration;
+				new_block->time_set = op_start_time;
+				new_block->time_freed = op_start_time + op_duration;
 				new_block->non_temporal_action_name = op.get_non_temporal_action_name();
 
 				blocked_vars.push_back(*new_block);
@@ -487,45 +657,54 @@ State::State(const State &predecessor, const Operator &op)
 		}
     } else
     {
-    	op_end_time = predecessor.g_current_time_value + 0.01;
+    	op_end_time = op_start_time + 0.01;
     	g_time_value = 0.01;
-    	g_current_time_value = predecessor.g_current_time_value + 0.01;
-    }
+    	g_current_time_value = op_start_time + 0.01;
 
-	/* for(int k = 0; k < external_blocked_vars.size(); k++)
-	{
-		if(external_blocked_vars[k]->val_pre == -2)
-			continue;
-
-		if((external_blocked_vars[k]->time_set >= predecessor.g_current_time_value) &&
-				(external_blocked_vars[k]->time_set < op_end_time))
+		if(use_hard_temporal_constraints)
 		{
-
-			bool action_changes_constraint = false;
-			vector<PrePost>::const_iterator it_pp = op.get_pre_post().begin();
-			for(; it_pp != op.get_pre_post().end(); ++it_pp) {
-				PrePost pp = *it_pp;
-				if(pp.var == external_blocked_vars[k]->var)
-				{
-					action_changes_constraint = true;
-				}
-			}
-			if(!action_changes_constraint)
+	    	// Check if the time has to be updated because of external constraints
+			for(int k = 0; k < g_shared_vars_timed_values.size(); k++)
 			{
-				const std::vector<Prevail> prevail;
-				PrePost* pre_post = new PrePost(external_blocked_vars[k]->var, external_blocked_vars[k]->val_pre,
-						external_blocked_vars[k]->val_pos, 0, prevail);
-				if(pre_post->does_fire(predecessor))
+				vector<PrePost>::const_iterator it_pp = op.get_pre_post().begin();
+				for(; it_pp != op.get_pre_post().end(); ++it_pp)
 				{
-					vars[pre_post->var] = pre_post->post;
-					// cout << "external var: " << vars[pre_post->var] << " to " << pre_post->post << endl;
+					PrePost pp = *it_pp;
+					if(pp.var == g_shared_vars_timed_values[k]->first)
+					{
+						// Search constraint value at that time
+						for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
+						{
+							if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+									(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+							{
+								if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
+										(pp.pre != -1) &&
+										((*(g_shared_vars_timed_values[k]->second))[j]->first != -1)
+								  )
+								{
+									// Set the new time value to a time window when the action can be executed
+									float new_time = get_new_time_window(op, this, op_duration, *(g_shared_vars_timed_values[k]->second), pp.pre);
+									g_current_time_value = new_time;
+									op_start_time = new_time;
+									op_end_time = g_current_time_value + 0.01;
+									break;
+								} else if(op_duration > (((*(g_shared_vars_timed_values[k]->second))[j + 1]->second) - (this->get_g_current_time_value())))
+								{
+									// Set the new time value to a time window when the action can be executed
+									float new_time = get_new_time_window(op, this, op_duration, *(g_shared_vars_timed_values[k]->second), pp.pre);
+									g_current_time_value = new_time;
+									op_start_time = new_time;
+									op_end_time = g_current_time_value + 0.01;
+									break;
+								}
+							}
+						}
+					}
 				}
-				else
-					cout << "something bad happened" << endl;
-				delete pre_post;
 			}
 		}
-	}*/
+    }
 
     // Update values affected by operator.
     for(int i = 0; i < op.get_pre_post().size(); i++) {
@@ -603,6 +782,40 @@ State::State(const State &predecessor, const Operator &op)
     if (g_use_metric) // if using action costs, all costs have been increased by 1
     	g_value = g_value - 1;
 }
+
+float get_new_time_window(Operator op, State* curr, float op_duration, vector<pair<int, float>* > ex_const_vector, int value) {
+
+	float new_init_time = 0;
+	float current_time = curr->get_g_current_time_value();
+
+	bool new_window_found = false;
+	for(int i = 0; i < (ex_const_vector.size() - 1); i++)
+	{
+		if((current_time > ex_const_vector[i]->second) &&
+				(current_time < ex_const_vector[i + 1]->second) &&
+				(value == ex_const_vector[i]->first))
+		{
+			float time_window_size =
+					(ex_const_vector[i + 1]->second) -
+					(ex_const_vector[i]->second);
+			if(op_duration < time_window_size)
+			{
+				new_window_found = true;
+				new_init_time = ex_const_vector[i]->second;
+			}
+		}
+	}
+
+	if((!new_window_found) && (ex_const_vector[ex_const_vector.size() - 1]->first == value))
+	{
+			new_window_found = true;
+			new_init_time = ex_const_vector[ex_const_vector.size() - 1]->second;
+	}
+
+	return new_init_time;
+}
+
+
 
 void State::dump() const {
     for(int i = 0; i < vars.size(); i++)

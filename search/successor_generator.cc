@@ -52,6 +52,8 @@ public:
     virtual void _dump(string indent);
 };
 
+extern bool use_hard_temporal_constraints;
+
 SuccessorGeneratorSwitch::SuccessorGeneratorSwitch(istream &in) {
     in >> switch_var;
     immediate_ops = read_successor_generator(in);
@@ -176,6 +178,7 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 		// Get action duration, temporal duration, not snap.
 		// start --- end
 		float op_end_time = curr.get_g_current_time_value() + 0.01;
+		float op_duration = 0;
 		if(op->get_name().find("_end") != string::npos)
 		{
 			vector<runn_action>::const_iterator it_ra = curr.running_actions.begin();
@@ -190,30 +193,126 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 
 				break;
 			}
+		}else if(op->get_name().find("_start") != string::npos)
+		{
+			// Get the duration calculating the costfrom the current state
+			vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
+			for(; it_pp != op->get_pre_post().end(); ++it_pp) {
+				PrePost pp = *it_pp;
+				if(g_variable_name[pp.var] == total_time_var)
+				{
+					if(pp.have_runtime_cost_effect)
+					{
+						op_duration = curr.calculate_runtime_efect<float>(pp.runtime_cost_effect);
+					} else {
+						op_duration = pp.f_cost;
+					}
+					break;
+				}
+			}
 		}
 
+		/* bool action_changes_constraint = false;
 		for(int k = 0; k < external_blocked_vars.size(); k++)
 		{
 			if((external_blocked_vars[k]->time_set >= curr.get_g_current_time_value()) &&
 					(external_blocked_vars[k]->time_set < op_end_time))
 			{
-				bool action_changes_constraint = false;
 				vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
 				for(; it_pp != op->get_pre_post().end(); ++it_pp)
 				{
 
-					if(external_blocked_vars[k]->val_pre == -2)
+					PrePost pp = *it_pp;
+					if(pp.var == external_blocked_vars[k]->var)
 					{
-						if(curr[external_blocked_vars[k]->var] != external_blocked_vars[k]->val_pos)
+						if((op->get_name().find("_end") != string::npos) && (curr.running_actions.size() != 1))
+						{
+							op_valid = false;
+							break;
+						} else if ((op->get_name().find("_start") != string::npos) && (curr.running_actions.size() != 0)){
+							op_valid = false;
+							break;
+						}
+						action_changes_constraint = true;
+					}
+				}
+			}
+		} */
+
+		for(int k = 0; (k < g_shared_vars_timed_values.size()) && (op_valid); k++)
+		{
+			vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
+			for(; it_pp != op->get_pre_post().end(); ++it_pp)
+			{
+				PrePost pp = *it_pp;
+				if(pp.var == g_shared_vars_timed_values[k]->first){
+					// Search constraint value at that time
+					bool tested = false;
+					for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
+					{
+						if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+								(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+						{
+							tested = true;
+							if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
+									(pp.pre != -1) &&
+									((*(g_shared_vars_timed_values[k]->second))[j]->first != -1)
+							  )
+							{
+								/* if((op->get_name().find("_end") != string::npos) && (curr.running_actions.size() != 1))
+								{
+									op_valid = false;
+									break;
+								} else */
+								if(!use_hard_temporal_constraints)
+								{
+									op_valid = false;
+									break;
+								}
+								if(is_temporal) {
+									if ((op->get_name().find("_start") != string::npos) && (curr.running_actions.size() != 0)){
+										op_valid = false;
+										break;
+									}
+								} else if (op->get_name().find("_end") != string::npos){
+									op_valid = false;
+									break;
+								}
+							} else if(op_duration > (((*(g_shared_vars_timed_values[k]->second))[j + 1]->second) - (curr.get_g_current_time_value())))
+							{
+								/* if((op->get_name().find("_end") != string::npos) && (curr.running_actions.size() != 1))
+								{
+									op_valid = false;
+									break;
+								} else */
+								if(!use_hard_temporal_constraints)
+								{
+									op_valid = false;
+									break;
+								}
+								if(is_temporal) {
+									if ((op->get_name().find("_start") != string::npos) && (curr.running_actions.size() != 0)){
+										op_valid = false;
+										break;
+									} else if (op->get_name().find("_end") != string::npos){
+										op_valid = false;
+										break;
+									}
+								}
+							}
+						}
+					}
+
+					if(!tested)
+					{
+						if(((*(g_shared_vars_timed_values[k]->second))[g_shared_vars_timed_values[k]->second->size() - 1]->first != pp.pre) &&
+								(pp.pre != -1) &&
+								((*(g_shared_vars_timed_values[k]->second))[g_shared_vars_timed_values[k]->second->size() - 1]->first != -1)
+						  )
 						{
 							op_valid = false;
 							break;
 						}
-					}
-					else if((curr[external_blocked_vars[k]->var] != external_blocked_vars[k]->val_pre) && (external_blocked_vars[k]->val_pre != -1))
-					{
-						op_valid = false;
-						break;
 					}
 				}
 			}
@@ -226,6 +325,8 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 		}else
 			it++;
 	}
+
+	return;
 }
 
 void check_var_locks_validity(

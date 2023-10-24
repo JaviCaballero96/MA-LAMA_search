@@ -105,4 +105,6 @@ public:
     T calculate_runtime_efect(string s_effect) const;
 };
 
+float get_new_time_window(Operator op, State* curr, float op_duration, vector<pair<int, float>* > ex_const_vector, int value);
+
 #endif

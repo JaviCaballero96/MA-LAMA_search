@@ -44,6 +44,7 @@ class LandmarksGraph;
 
 void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders, bool read_init_state, bool read_runtime_constraints);
 void read_runtime_contraints();
+void process_shared_vars_values();
 void read_ext_init_state();
 void dump_everything();
 
@@ -62,7 +63,7 @@ typedef struct{
 	int val_pos;
 	float time_set;
 	float duration;
-	bool effect_applied;
+	bool in_current_agent;
 } ext_constraint;
 
 extern bool g_use_metric;
@@ -79,6 +80,7 @@ extern vector<ext_constraint*> external_blocked_vars;
 extern State *g_initial_state;
 extern vector<pair<int, int> > g_goal;
 extern vector<pair<string, int> > g_shared_vars;
+extern vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
 extern vector<Operator> g_operators;
 extern vector<Operator> g_axioms;
 extern AxiomEvaluator *g_axiom_evaluator;
@@ -92,5 +94,6 @@ extern FFHeuristic *g_ff_heur;
 extern LandmarksCountHeuristic *g_lm_heur;
 extern LandmarksGraph *g_lgraph;
 extern bool is_temporal;
+extern bool use_hard_temporal_constraints;
 
 #endif
