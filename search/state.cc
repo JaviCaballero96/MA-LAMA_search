@@ -367,7 +367,7 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 		}
     }
 
-	// Copy locked variables
+    this->numeric_vars_val.clear();
 	vector<float>::const_iterator it_f = new_predecessor.numeric_vars_val.begin();
 	for(; it_f != new_predecessor.numeric_vars_val.end(); it_f++)
 	{

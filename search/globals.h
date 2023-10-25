@@ -46,6 +46,7 @@ void read_everything(istream &in, bool generate_landmarks, bool reasonable_order
 void read_runtime_contraints();
 void process_shared_vars_values();
 void read_ext_init_state();
+void read_store_ext_init_state();
 void dump_everything();
 
 void check_magic(istream &in, string magic);
@@ -76,6 +77,8 @@ extern vector<int> g_axiom_layers;
 extern vector<int> g_default_axiom_values;
 extern string total_time_var;
 extern vector<ext_constraint*> external_blocked_vars;
+extern vector<pair<string, int> > external_init_state_vars;
+extern vector<pair<string, float> > external_init_state_numeric_vars;
 
 extern State *g_initial_state;
 extern vector<pair<int, int> > g_goal;

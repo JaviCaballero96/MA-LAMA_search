@@ -42,6 +42,7 @@
 #include <climits>
 #include <string>
 #include <cstring>
+#include <algorithm>
 
 using namespace std;
 
@@ -264,6 +265,7 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
     }
     remove(state_outfile_name.c_str());
     state_outfile.open(state_outfile_name.c_str(), ios::out);
+    remove(constraints_outfile_name.c_str());
     constraints_outfile.open(constraints_outfile_name.c_str(), ios::out);
     constraints_outfile << "begin_constraints" << endl;
     for(int i = 0; i < plan.size(); i++) {
@@ -497,17 +499,42 @@ void print_previous_constraints(ofstream& constraints_outfile)
 
 void print_vars_end_state(ofstream& state_outfile, vector<int> vars_end_state, vector<float> num_vars_end_state)
 {
+	int n_ext_var = 0, n_ext_num_var = 0;
+
+	for(int i = 0; i < external_init_state_vars.size(); i++)
+	{
+		if ( std::find(g_variable_name.begin(),
+				g_variable_name.end(),
+				external_init_state_vars[i].first) == g_variable_name.end() )
+			n_ext_var = n_ext_var + 1;
+	}
+
+	for(int i = 0; i < external_init_state_numeric_vars.size(); i++)
+	{
+		if ( std::find(g_variable_name.begin(),
+				g_variable_name.end(),
+				external_init_state_numeric_vars[i].first) == g_variable_name.end())
+			n_ext_num_var = n_ext_num_var + 1;
+	}
+
 	state_outfile << "begin_state" << endl;
-	state_outfile << vars_end_state.size() << endl;
+	state_outfile << vars_end_state.size() + n_ext_var << endl;
 	for(int i = 0; i < vars_end_state.size(); i++)
 	{
 		state_outfile << g_variable_name[i] << " - " << vars_end_state[i] << endl;
 
 	}
+	for(int i = 0; i < external_init_state_vars.size(); i++)
+	{
+		if ( std::find(g_variable_name.begin(),
+				g_variable_name.end(),
+				external_init_state_vars[i].first) == g_variable_name.end() )
+			state_outfile << external_init_state_vars[i].first << " - " << external_init_state_vars[i].second << endl;
+	}
 	state_outfile << "end_state" << endl;
 
 	state_outfile << "begin_num_state" << endl;
-	state_outfile << num_vars_end_state.size() << endl;
+	state_outfile << num_vars_end_state.size() + n_ext_num_var << endl;
 	for(int i = 0; i < num_vars_end_state.size(); i++)
 	{
 		if(num_vars_end_state[i] != numeric_limits<float>::max())
@@ -517,6 +544,13 @@ void print_vars_end_state(ofstream& state_outfile, vector<int> vars_end_state, v
 		{
 			state_outfile << g_variable_name[i] << " ! " << endl;
 		}
+	}
+	for(int i = 0; i < external_init_state_numeric_vars.size(); i++)
+	{
+		if ( std::find(g_variable_name.begin(),
+				g_variable_name.end(),
+				external_init_state_numeric_vars[i].first) == g_variable_name.end() )
+			state_outfile << external_init_state_numeric_vars[i].first << " - " << external_init_state_numeric_vars[i].second << endl;
 	}
 	state_outfile << "end_num_state" << endl;
 }

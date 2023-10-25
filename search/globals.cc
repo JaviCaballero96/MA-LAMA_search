@@ -169,6 +169,7 @@ void read_everything(istream &in, bool generate_landmarks, bool reasonable_order
     if(read_runtime_constraints)
     {
     	read_runtime_contraints();
+    	read_store_ext_init_state();
     }
     read_goal(in);
     read_operators(in);
@@ -399,6 +400,48 @@ void process_shared_vars_values()
 	}
 }
 
+void read_store_ext_init_state()
+{
+	std::fstream in;
+	int var_list_size;
+	string slash = "";
+	in.open ("end_state", std::fstream::in);
+	check_magic(in, "begin_state");
+	in >> var_list_size;
+	for(int i = 0; i < var_list_size; i++)
+	{
+		string var_name = "";
+		int val = 0;
+		in >> var_name;
+		in >> slash;
+		in >> val;
+		pair<string, int> new_item;
+		new_item.first = var_name;
+		new_item.second = val;
+		external_init_state_vars.push_back(new_item);
+	}
+	check_magic(in, "end_state");
+	check_magic(in, "begin_num_state");
+	in >> var_list_size;
+	for(int i = 0; i < var_list_size; i++)
+	{
+		string var_name = "";
+		string aux = "";
+		in >> var_name;
+		in >> aux;
+		if(aux == "-")
+		{
+			float val = 0;
+			in >> val;
+			pair<string, float> new_item;
+			new_item.first = var_name;
+			new_item.second = val;
+			external_init_state_numeric_vars.push_back(new_item);
+		}
+	}
+	check_magic(in, "end_num_state");
+}
+
 void read_ext_init_state()
 {
 	std::fstream in;
@@ -414,6 +457,10 @@ void read_ext_init_state()
 		in >> var_name;
 		in >> slash;
 		in >> val;
+		pair<string, int> new_item;
+		new_item.first = var_name;
+		new_item.second = val;
+		external_init_state_vars.push_back(new_item);
 		for(int j = 0; j < g_variable_name.size(); j++)
 		{
 			if(var_name == g_variable_name[j])
@@ -436,6 +483,10 @@ void read_ext_init_state()
 		{
 			float val = 0;
 			in >> val;
+			pair<string, float> new_item;
+			new_item.first = var_name;
+			new_item.second = val;
+			external_init_state_vars.push_back(new_item);
 			for(int j = 0; j < g_variable_name.size(); j++)
 			{
 				if(var_name == g_variable_name[j])
@@ -463,6 +514,8 @@ vector<ext_constraint*> external_blocked_vars;
 vector<pair<int, int> > g_goal;
 vector<pair<string, int> > g_shared_vars;
 vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
+vector<pair<string, int> > external_init_state_vars;
+vector<pair<string, float> > external_init_state_numeric_vars;
 vector<Operator> g_operators;
 vector<Operator> g_axioms;
 AxiomEvaluator *g_axiom_evaluator;
