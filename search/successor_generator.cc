@@ -273,8 +273,11 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 									if ((op->get_name().find("_start") != string::npos) && (curr.running_actions.size() != 0)){
 										op_valid = false;
 										break;
+									} else if (op->get_name().find("_end") != string::npos){
+										op_valid = false;
+										break;
 									}
-								} else if (op->get_name().find("_end") != string::npos){
+								}else {
 									op_valid = false;
 									break;
 								}

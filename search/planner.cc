@@ -350,7 +350,6 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		    	if(shared_number_2 == var)
 		    	{
 		    		string shared_str = "(";
-		    		float block_var_duration = 0.01;
 		    		stringstream ss1, ss2, ss3;
 		    		string aux1, aux2, aux3;
 		    		ss1.str("");
@@ -364,16 +363,21 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		    		ss3 >> aux3;
 		    		shared_str = shared_str + "1 " + aux1 + " " + aux2 + " " + aux3 + ")";
 
-					if(plan[i]->get_name().find("_start") != string::npos) {
-						/* for(int k = 0; k < blocked_vars_info[i].size(); k++) {
-							if((blocked_vars_info[i][k].var == var) && (blocked_vars_info[i][k].time_set == action_init_time)) {
-								block_var_duration = blocked_vars_info[i][k].time_freed - action_init_time;
-							}
-						} */
-						constraints_outfile << action_init_time << " " << (action_init_time + action_duration_time - 0.01) << " " << shared_str << endl;
-					} else {
-						constraints_outfile << action_init_time << " " << (action_init_time + block_var_duration) << " " << shared_str << endl;
-					}
+		    		if(is_temporal){
+						if(plan[i]->get_name().find("_start") != string::npos) {
+							/* for(int k = 0; k < blocked_vars_info[i].size(); k++) {
+								if((blocked_vars_info[i][k].var == var) && (blocked_vars_info[i][k].time_set == action_init_time)) {
+									block_var_duration = blocked_vars_info[i][k].time_freed - action_init_time;
+								}
+							} */
+							constraints_outfile << action_init_time << " " << (action_init_time + action_duration_time - 0.01) << " " << shared_str << endl;
+						} else {
+							constraints_outfile << action_init_time << " " << (action_init_time + 0.01) << " " << shared_str << endl;
+						}
+		    		} else {
+		    			constraints_outfile << action_init_time << " " << (action_init_time + 0.01) << " " << shared_str << endl;
+		    		}
+
 		    	}
 		    }
 		}
