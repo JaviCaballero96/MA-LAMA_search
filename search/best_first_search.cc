@@ -74,9 +74,10 @@ void BestFirstSearchEngine::initialize() {
     assert(!open_lists.empty());
 }
 
-void BestFirstSearchEngine::statistics() const {
+float BestFirstSearchEngine::statistics() const {
     cout << "Expanded " << closed_list.size() << " state(s)." << endl;
     cout << "Generated " << generated_states << " state(s)." << endl;
+    return closed_list.size();
 }
 
 int BestFirstSearchEngine::step() {

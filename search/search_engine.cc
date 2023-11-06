@@ -31,7 +31,7 @@ SearchEngine::SearchEngine() {
 SearchEngine::~SearchEngine() {
 }
 
-void SearchEngine::statistics() const {
+float SearchEngine::statistics() const {
 }
 
 bool SearchEngine::found_solution() const {

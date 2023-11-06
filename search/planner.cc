@@ -50,7 +50,8 @@ bool use_hard_temporal_constraints = false;
 
 float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
 		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info, vector<float> plan_cost_info,
-		vector<int> vars_end_state, vector<float> num_vars_end_state, vector<vector<blocked_var> > blocked_vars_info);
+		vector<int> vars_end_state, vector<float> num_vars_end_state, vector<vector<blocked_var> > blocked_vars_info,
+		BestFirstSearchEngine* engine);
 void print_previous_constraints(ofstream& constraints_outfile);
 void print_vars_end_state(ofstream& state_outfile, vector<int> vars_end_state, vector<float> num_vars_end_state);
 
@@ -208,7 +209,8 @@ int main(int argc, const char **argv) {
 	if(engine->found_solution())
 	    plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no,
 	    		engine->get_plan_temporal_info(), engine->get_plan_duration_info(), engine->get_plan_cost_info(),
-				engine->get_end_state(), engine->get_num_end_state(), engine->get_blocked_vars_info());
+				engine->get_end_state(), engine->get_num_end_state(), engine->get_blocked_vars_info(),
+				engine);
 
 	engine->statistics();
 
@@ -245,7 +247,7 @@ int main(int argc, const char **argv) {
 float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
 		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info,
 		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state,
-		vector<vector<blocked_var> > blocked_vars_info) {
+		vector<vector<blocked_var> > blocked_vars_info, BestFirstSearchEngine* engine) {
     ofstream outfile;
     string state_outfile_name = "end_state";
     ofstream state_outfile;
@@ -377,7 +379,6 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		    		} else {
 		    			constraints_outfile << action_init_time << " " << (action_init_time + 0.01) << " " << shared_str << endl;
 		    		}
-
 		    	}
 		    }
 		}
@@ -388,6 +389,7 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 
     }
     outfile << "Cost: " <<  plan_cost << endl;
+    outfile << "Expanded nodes: " << engine->statistics() << endl;
     outfile.close();
     print_vars_end_state(state_outfile, vars_end_state, num_vars_end_state);
     state_outfile.close();

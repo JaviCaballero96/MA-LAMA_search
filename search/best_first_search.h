@@ -79,7 +79,7 @@ public:
     ~BestFirstSearchEngine();
     virtual void add_heuristic(Heuristic *heuristic, bool use_estimates,
 		       bool use_preferred_operators);
-    virtual void statistics() const;
+    virtual float statistics() const;
 
     inline const Operator *get_current_operator() const {
         // Used by LandmarksCountHeuristic

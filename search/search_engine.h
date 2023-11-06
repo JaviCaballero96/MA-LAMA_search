@@ -49,7 +49,7 @@ protected:
 public:
     SearchEngine();
     virtual ~SearchEngine();
-    virtual void statistics() const;
+    virtual float statistics() const;
     bool found_solution() const;
     const Plan &get_plan() const;
     void search();
