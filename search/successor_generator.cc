@@ -83,7 +83,10 @@ void check_functional_validity(
 		// we have to update the numeric values up to the point to which the action has been executed
 		// create an auxiliary numeric values vector
 		State* aux_state = new State(curr);
-		aux_state->numeric_vars_val = curr.numeric_vars_val;
+		for(int j = 0; j < curr.numeric_vars_val.size(); j++)
+		{
+			aux_state->numeric_vars_val[j] = curr.numeric_vars_val[j];
+		}
 
 		// apply the numeric effects that are running, rules are:
 		// -- increase and decrease effects happen during all the time the action executes

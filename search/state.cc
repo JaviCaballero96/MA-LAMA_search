@@ -188,8 +188,12 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 					if(pp.have_runtime_cost_effect)
 					{
 						op_duration = new_predecessor.calculate_runtime_efect<float>(pp.runtime_cost_effect);
+						if(op_duration == 0)
+							op_duration = 0.01;
 					} else{
 						op_duration = pp.f_cost;
+						if(op_duration == 0)
+							op_duration = 0.01;
 					}
 
 					break;
@@ -476,8 +480,12 @@ State::State(const State &predecessor, const Operator &op)
 					if(pp.have_runtime_cost_effect)
 					{
 						op_duration = predecessor.calculate_runtime_efect<float>(pp.runtime_cost_effect);
+						if(op_duration == 0)
+							op_duration = 0.01;
 					} else{
 						op_duration = pp.f_cost;
+						if(op_duration == 0)
+							op_duration = 0.01;
 					}
 
 					break;
@@ -940,7 +948,6 @@ int State::check_partial_plan(hash_set<const LandmarkNode*, hash_pointer>& reach
 
 template <typename T>
 T State::calculate_runtime_efect(string s_effect) const {
-
 	// First get current value of runtime numerical variables
 	string s_eff_aux = s_effect;
 	while(s_effect.find(":") != string::npos){
@@ -953,7 +960,7 @@ T State::calculate_runtime_efect(string s_effect) const {
 		stringstream strm(var);
 		strm >> i_var;
 		var_value = numeric_vars_val[i_var];
-   		std::ostringstream strm_var;
+		std::ostringstream strm_var;
    		strm_var << var_value;
 
 		string from = ":" + var + ":";

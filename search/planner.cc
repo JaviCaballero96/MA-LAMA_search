@@ -163,82 +163,82 @@ int main(int argc, const char **argv) {
     g_ff_heur = NULL;
     int wastar_weight = wa_star_weights[0];
     bool reducing_weight = true;
-    do{
-	iteration_no++;
-	cout << "Search iteration " << iteration_no << endl;
-	if(reducing_weight && wa_star_weights[iteration_no - 1] != -1)
-	    wastar_weight = wa_star_weights[iteration_no - 1];
-	else {
-	    cout << "No more new weight, weight is " << wastar_weight << endl;
-	    reducing_weight = false;
+	do{
+		iteration_no++;
+		cout << "Search iteration " << iteration_no << endl;
+		if(reducing_weight && wa_star_weights[iteration_no - 1] != -1)
+			wastar_weight = wa_star_weights[iteration_no - 1];
+		else {
+			cout << "No more new weight, weight is " << wastar_weight << endl;
+			reducing_weight = false;
+		}
+		// Initialize search engine and heuristics (this is cheap and we want to vary search type
+		// and heuristics, so we initialize freshly in each iteration)
+		BestFirstSearchEngine* engine;
+		if(search_type == wa_star)
+			// Parameters of WAStar are 1) weight for heuristic, 2) upper bound on solution
+			// cost (this cuts of search branches if the cost of a node exceeds the bound),
+			// use -1 for none.
+			engine = new WAStarSearchEngine(wastar_weight, wastar_bound);
+		else
+			engine = new BestFirstSearchEngine;
+
+		print_heuristics_used(ff_heuristic, ff_preferred_operators,
+					  landmarks_heuristic, landmarks_preferred_operators);
+		if(landmarks_heuristic || landmarks_preferred_operators) {
+			if(landmarks_preferred_operators)
+			if(!g_ff_heur)
+				g_ff_heur = new FFHeuristic;
+			g_lm_heur = new LandmarksCountHeuristic(
+			*g_lgraph, *engine, landmarks_preferred_operators, g_ff_heur);
+			engine->add_heuristic(g_lm_heur, landmarks_heuristic,
+					  landmarks_preferred_operators);
+		}
+		if(ff_heuristic || ff_preferred_operators) {
+			if(!g_ff_heur)
+			g_ff_heur = new FFHeuristic;
+			engine->add_heuristic(g_ff_heur, ff_heuristic,
+					  ff_preferred_operators);
+		}
+
+		// Search
+		times(&search_start);
+		engine->search();
+		times(&search_end);
+		float plan_cost = FLT_MAX;
+		int search_ms = (search_end.tms_utime - search_start.tms_utime) * 10;
+		int total_ms = (search_end.tms_utime - start.tms_utime) * 10;
+		if(engine->found_solution())
+			plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no,
+					engine->get_plan_temporal_info(), engine->get_plan_duration_info(), engine->get_plan_cost_info(),
+					engine->get_end_state(), engine->get_num_end_state(), engine->get_blocked_vars_info(),
+					engine, total_ms / 1000.0);
+
+		engine->statistics();
+
+		cout << "Search time: " << search_ms / 1000.0 << " seconds" << endl;
+		cout << "Total time: " << total_ms / 1000.0 << " seconds" << endl;
+		solution_found |= engine->found_solution();
+
+		if(!engine->found_solution())
+			iterative_search = false;
+
+		// Set new parameters for next search
+		search_type = wa_star;
+		wastar_bound = plan_cost - 0.0001;
+		if(wastar_weight <= 10) { // make search less greedy
+			ff_preferred_operators = false;
+			landmarks_preferred_operators = false;
+		}
+
+		// If the heuristic weight was already 0, we can only search for better solutions
+		// by decreasing the bound (note: this could be improved by making WA* expand
+		// all fringe states, but seems to have little importance).
+		if(wastar_weight == 0) {
+			wastar_bound--;
+		}
+
 	}
-	// Initialize search engine and heuristics (this is cheap and we want to vary search type
-	// and heuristics, so we initialize freshly in each iteration)
-	BestFirstSearchEngine* engine; 
-	if(search_type == wa_star)
-		// Parameters of WAStar are 1) weight for heuristic, 2) upper bound on solution
-		// cost (this cuts of search branches if the cost of a node exceeds the bound), 
-		// use -1 for none.
-	    engine = new WAStarSearchEngine(wastar_weight, wastar_bound);
-	else
-	    engine = new BestFirstSearchEngine;
-
-	print_heuristics_used(ff_heuristic, ff_preferred_operators, 
-			      landmarks_heuristic, landmarks_preferred_operators);
-	if(landmarks_heuristic || landmarks_preferred_operators) {
-	    if(landmarks_preferred_operators)
-		if(!g_ff_heur)
-		    g_ff_heur = new FFHeuristic;
-	    g_lm_heur = new LandmarksCountHeuristic(
-		*g_lgraph, *engine, landmarks_preferred_operators, g_ff_heur);
-	    engine->add_heuristic(g_lm_heur, landmarks_heuristic,
-				  landmarks_preferred_operators);
-	}
-	if(ff_heuristic || ff_preferred_operators) {
-	    if(!g_ff_heur)
-		g_ff_heur = new FFHeuristic;
-	    engine->add_heuristic(g_ff_heur, ff_heuristic,
-				  ff_preferred_operators);
-	} 
-
-	// Search
-	times(&search_start);
-	engine->search();
-	times(&search_end);
-	float plan_cost = FLT_MAX;
-	int search_ms = (search_end.tms_utime - search_start.tms_utime) * 10;
-	int total_ms = (search_end.tms_utime - start.tms_utime) * 10;
-	if(engine->found_solution())
-	    plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no,
-	    		engine->get_plan_temporal_info(), engine->get_plan_duration_info(), engine->get_plan_cost_info(),
-				engine->get_end_state(), engine->get_num_end_state(), engine->get_blocked_vars_info(),
-				engine, total_ms / 1000.0);
-
-	engine->statistics();
-
-	cout << "Search time: " << search_ms / 1000.0 << " seconds" << endl;
-	cout << "Total time: " << total_ms / 1000.0 << " seconds" << endl;
-	solution_found |= engine->found_solution();
-
-	if(!engine->found_solution())
-	    iterative_search = false;
-
-	// Set new parameters for next search
-	search_type = wa_star;
-	wastar_bound = plan_cost - 0.0001;
-	if(wastar_weight <= 10) { // make search less greedy
-	    ff_preferred_operators = false;
-	    landmarks_preferred_operators = false;
-	}
-
-	// If the heuristic weight was already 0, we can only search for better solutions
-	// by decreasing the bound (note: this could be improved by making WA* expand 
-	// all fringe states, but seems to have little importance).
-	if(wastar_weight == 0) {
-	    wastar_bound--;
-	}
-
-    }
     while(iterative_search);
 
     return solution_found ? 0 : 1; 
