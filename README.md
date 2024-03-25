@@ -22,6 +22,3 @@ Generates in the root directory:
   - end.state: contains the state of the shared variables for the most optimized found solution.
   - current_constraints: contains the temporal constraints that the most optimized found solution sets to the shared variables.
   - agnet_[n_agnet].[n_found_solution]: one file for each solution foiund, written in the snap task paradigm.
-
-    output_preproagent[n_agnet]: one for each agent, contains the processed metric, variables, shared variables, initial state, goals, operators, and causal graph.
-
