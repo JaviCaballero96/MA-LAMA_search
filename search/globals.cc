@@ -118,6 +118,26 @@ void read_goal(istream &in) {
     check_magic(in, "end_goal");
 }
 
+void read_timed_goals(istream &in) {
+  check_magic(in, "begin_timed_goals");
+  int count;
+  in >> count;
+  for(int i = 0; i < count; i++) {
+    int varNo, val;
+    in >> varNo >> val;
+    g_timed_goals.push_back(make_pair(make_pair(varNo, val), vector<pair<pair<int, int>, double> >()));
+    int n_timed_facts = 0;
+    in >> n_timed_facts;
+    for(int i = 0; i < n_timed_facts; i++){
+    	int fvar, fval;
+    	double ftime;
+    	in >> fvar >> fval >> ftime;
+    	g_timed_goals.back().second.push_back(make_pair(make_pair(fvar, fval), ftime));
+    }
+  }
+  check_magic(in, "end_timed_goals");
+}
+
 void dump_goal() {
     cout << "Goal Conditions:" << endl;
     for(int i = 0; i < g_goal.size(); i++)
@@ -172,6 +192,7 @@ void read_everything(istream &in, bool generate_landmarks, bool reasonable_order
     	read_store_ext_init_state();
     }
     read_goal(in);
+    read_timed_goals(in);
     read_operators(in);
     read_axioms(in);
     check_magic(in, "begin_SG");
@@ -512,6 +533,7 @@ vector<int> g_default_axiom_values;
 State *g_initial_state;
 vector<ext_constraint*> external_blocked_vars;
 vector<pair<int, int> > g_goal;
+vector<pair<pair<int, int>, vector<pair<pair<int, int>, double > > > > g_timed_goals;
 vector<pair<string, int> > g_shared_vars;
 vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
 vector<pair<string, int> > external_init_state_vars;

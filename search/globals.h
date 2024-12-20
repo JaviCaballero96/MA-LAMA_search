@@ -82,6 +82,7 @@ extern vector<pair<string, float> > external_init_state_numeric_vars;
 
 extern State *g_initial_state;
 extern vector<pair<int, int> > g_goal;
+extern vector<pair<pair<int, int>, vector<pair<pair<int, int>, double > > > > g_timed_goals;
 extern vector<pair<string, int> > g_shared_vars;
 extern vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
 extern vector<Operator> g_operators;
