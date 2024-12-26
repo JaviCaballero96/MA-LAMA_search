@@ -46,5 +46,7 @@ void check_var_locks_validity(
 		const State &curr, vector<const Operator *> &ops);
 void check_temporal_soundness_validity(
 		const State &curr, vector<const Operator *> &ops);
+void check_temporal_goals_validity(
+		const State &curr, vector<const Operator *> &ops);
 
 #endif

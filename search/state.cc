@@ -371,6 +371,50 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 		}
     }
 
+    // Copy the values for the already attained temporal goals
+	for(int i = 0; i < new_predecessor.timed_goals_obtained.size(); i++) {
+		this->timed_goals_obtained.push_back(new_predecessor.timed_goals_obtained[i]);
+	}
+
+	// Check if a new temporal goal is being obtained
+	// No temporally invalid action should reach this point
+	for(int i = 0; i < g_timed_goals.size(); i++) {
+		int gt_var = g_timed_goals[i].first.first;
+		int gt_val = g_timed_goals[i].first.second;
+		bool gt_already_obtained = false;
+		for(int j = 0; j < this->timed_goals_obtained.size(); j++) {
+			if((this->timed_goals_obtained[j].first == gt_var) &&
+					(this->timed_goals_obtained[j].second == gt_val)) {
+				gt_already_obtained = true;
+				break;
+			}
+		}
+
+		// If the goal has not been already obtained,
+		// then check if it is attained by the effects of the applied action
+		if(!gt_already_obtained){
+			for(int j = 0; j < new_op.get_pre_post().size(); j++) {
+				PrePost pre_post = new_op.get_pre_post()[j];
+				if(pre_post.pre >= -1){
+					// We already now it has not been attained,
+					// just check if the effect is a temporal goal
+
+					// bool eff_goal = false;
+					for(int k = 0; k < g_timed_goals.size(); k++) {
+						if((pre_post.var == g_timed_goals[k].first.first) &&
+								(pre_post.post == g_timed_goals[k].first.second)) {
+							cout << "The temporal goal " << pre_post.var << "-" <<
+									pre_post.post << " is attained by the action " <<
+									new_op.get_name() << endl;
+							timed_goals_obtained.push_back(make_pair(pre_post.var, pre_post.post));
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
     this->numeric_vars_val.clear();
 	vector<float>::const_iterator it_f = new_predecessor.numeric_vars_val.begin();
 	for(; it_f != new_predecessor.numeric_vars_val.end(); it_f++)
@@ -713,6 +757,52 @@ State::State(const State &predecessor, const Operator &op)
 			}
 		}
     }
+
+
+    // Copy the values for the already attained temporal goals
+    for(int i = 0; i < predecessor.timed_goals_obtained.size(); i++) {
+    	this->timed_goals_obtained.push_back(predecessor.timed_goals_obtained[i]);
+    }
+
+    // Check if a new temporal goal is being obtained
+    // No temporally invalid action should reach this point
+    for(int i = 0; i < g_timed_goals.size(); i++) {
+    	int gt_var = g_timed_goals[i].first.first;
+    	int gt_val = g_timed_goals[i].first.second;
+    	bool gt_already_obtained = false;
+    	for(int j = 0; j < this->timed_goals_obtained.size(); j++) {
+    		if((this->timed_goals_obtained[j].first == gt_var) &&
+    				(this->timed_goals_obtained[j].second == gt_val)) {
+    			gt_already_obtained = true;
+    			break;
+    		}
+    	}
+
+    	// If the goal has not been already obtained,
+    	// then check if it is attained by the effects of the applied action
+    	if(!gt_already_obtained){
+    		for(int j = 0; j < op.get_pre_post().size(); j++) {
+    			PrePost pre_post = op.get_pre_post()[j];
+    			if(pre_post.pre >= -1){
+    				// We already now it has not been attained,
+    				// just check if the effect is a temporal goal
+
+    				// bool eff_goal = false;
+    				for(int k = 0; k < g_timed_goals.size(); k++) {
+    					if((pre_post.var == g_timed_goals[k].first.first) &&
+    							(pre_post.post == g_timed_goals[k].first.second)) {
+    						cout << "The temporal goal " << pre_post.var << "-" <<
+    								pre_post.post << " is attained by the action " <<
+									op.get_name() << endl;
+    						timed_goals_obtained.push_back(make_pair(pre_post.var, pre_post.post));
+    						break;
+    					}
+    				}
+    			}
+    		}
+    	}
+    }
+
 
     // Update values affected by operator.
     for(int i = 0; i < op.get_pre_post().size(); i++) {

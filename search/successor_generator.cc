@@ -444,6 +444,82 @@ void check_temporal_soundness_validity(
 	}
 }
 
+void check_temporal_goals_validity(const State &curr, vector<const Operator *> &ops){
+	// In case the application of an action makes the state miss a temporal goal,
+	// do not propagate this search branch
+
+	vector<const Operator *>::iterator it = ops.begin();
+	for(; it != ops.end();) {
+		const Operator * op = *it;
+		bool op_valid = true;
+
+		// Obtain the end time of the action
+		float action_end_time = 0.0;
+		if(op->get_name().find("_end") != string::npos)
+		{
+			vector<runn_action>::const_iterator it_ra_const = curr.running_actions.begin();
+			for(; (it_ra_const != curr.running_actions.end()); it_ra_const++)
+			{
+				if((*it_ra_const).non_temporal_action_name == op->get_non_temporal_action_name())
+				{
+					action_end_time = (*it_ra_const).time_end;
+					break;
+				}
+			}
+
+		} else {
+			action_end_time = curr.get_g_current_time_value() + 0.01;
+		}
+
+		// If the end_time has been extracted successfully,
+		// check the attained goals and delete operators that provoke invalid states
+		if (action_end_time != 0.0){
+			for (int i = 0; i < g_timed_goals.size(); i++) {
+				// Extract the time where this goal becomes invalid
+				float min_negative_time = 0.0;
+				for (int j = 0; j < g_timed_goals[i].second.size(); j++) {
+					// Only check for negative time limits
+					if (g_timed_goals[i].second[j].first.second == -1)
+						if ((min_negative_time == 0.0) || (min_negative_time > g_timed_goals[i].second[j].second))
+							min_negative_time = g_timed_goals[i].second[j].second;
+				}
+
+				// Check if the goal has been attained
+				if (min_negative_time != 0) {
+					bool timed_goal_attained = false;
+					for (int j = 0; j < curr.timed_goals_obtained.size(); j++) {
+						if ((curr.timed_goals_obtained[j].first) == (g_timed_goals[i].first.first) &&
+								(curr.timed_goals_obtained[j].second) == (g_timed_goals[i].first.second)) {
+							// The goal has been attained, no more checks are necessary
+							timed_goal_attained = true;
+							break;
+						}
+					}
+
+					// If the goal has not been attained, mark the operator as invalid
+					// if the current time is greater than the negative time limit for the goal
+					if (!timed_goal_attained) {
+						if (min_negative_time < action_end_time) {
+							op_valid = false;
+						}
+					}
+				}
+			}
+		} else {
+			cout << "Error during temporal goals temporal soundness check" << endl;
+		}
+
+
+		if (!op_valid){
+			it = ops.erase(it);
+
+		}else
+			it++;
+	}
+
+	return;
+}
+
 void SuccessorGeneratorSwitch::_dump(string indent) {
     cout << indent << "switch on " << g_variable_name[switch_var] << endl;
     cout << indent << "immediately:" << endl;

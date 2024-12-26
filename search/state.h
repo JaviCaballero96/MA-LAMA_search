@@ -75,6 +75,7 @@ public:
     vector<runn_action> running_actions;
     vector<float> numeric_vars_val;
     vector<string> applied_actions_vec;
+    vector<pair<int, int> > timed_goals_obtained;
     State(istream &in);
     // State(const State &origin);
     State(const State &predecessor, const Operator &op);
