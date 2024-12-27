@@ -132,6 +132,12 @@ int main(int argc, const char **argv) {
 	generate_landmarks = true;
     times(&landmarks_generation_start);
     read_everything(fs, generate_landmarks, reasonable_orders, read_init_state, read_runtime_constraints);
+
+    if (use_hard_temporal_constraints && (g_timed_goals.size() != 0)) {
+    	cout << "Hard temporal constraints and timed goals are currently not supported at the same time." << endl;
+    	cout << "For specific applications of MA-LAMA that may require these features, please contact the author" << endl;
+    	exit(0);
+    }
     // dump_everything();
     times(&landmarks_generation_end);
     int landmarks_generation_ms = (landmarks_generation_end.tms_utime - 

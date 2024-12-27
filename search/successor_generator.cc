@@ -454,7 +454,7 @@ void check_temporal_goals_validity(const State &curr, vector<const Operator *> &
 		bool op_valid = true;
 
 		// Obtain the end time of the action
-		float action_end_time = 0.0;
+		/* float action_end_time = 0.0;
 		if(op->get_name().find("_end") != string::npos)
 		{
 			vector<runn_action>::const_iterator it_ra_const = curr.running_actions.begin();
@@ -469,46 +469,35 @@ void check_temporal_goals_validity(const State &curr, vector<const Operator *> &
 
 		} else {
 			action_end_time = curr.get_g_current_time_value() + 0.01;
-		}
+		} */
 
 		// If the end_time has been extracted successfully,
 		// check the attained goals and delete operators that provoke invalid states
-		if (action_end_time != 0.0){
-			for (int i = 0; i < g_timed_goals.size(); i++) {
-				// Extract the time where this goal becomes invalid
-				float min_negative_time = 0.0;
-				for (int j = 0; j < g_timed_goals[i].second.size(); j++) {
-					// Only check for negative time limits
-					if (g_timed_goals[i].second[j].first.second == -1)
-						if ((min_negative_time == 0.0) || (min_negative_time > g_timed_goals[i].second[j].second))
-							min_negative_time = g_timed_goals[i].second[j].second;
-				}
-
-				// Check if the goal has been attained
-				if (min_negative_time != 0) {
-					bool timed_goal_attained = false;
-					for (int j = 0; j < curr.timed_goals_obtained.size(); j++) {
-						if ((curr.timed_goals_obtained[j].first) == (g_timed_goals[i].first.first) &&
-								(curr.timed_goals_obtained[j].second) == (g_timed_goals[i].first.second)) {
-							// The goal has been attained, no more checks are necessary
-							timed_goal_attained = true;
-							break;
-						}
-					}
-
-					// If the goal has not been attained, mark the operator as invalid
-					// if the current time is greater than the negative time limit for the goal
-					if (!timed_goal_attained) {
-						if (min_negative_time < action_end_time) {
-							op_valid = false;
+		for (int i = 0; i < g_timed_goals.size(); i++) {
+			// Check negative timed literals
+			for (int j = 0; j < g_timed_goals[i].second.size(); j++) {
+				if (g_timed_goals[i].second[j].first.second == -1) {
+					// Check if the variable is needed by the action
+					for (int k = 0; k < op->get_pre_post().size(); k++) {
+						PrePost prepost = op->get_pre_post()[k];
+						if((prepost.pre > -1) && (prepost.var == g_timed_goals[i].second[j].first.first)) {
+							// The var needs to have a certain value by the operator
+							// Check if the application time is later than the negative timed fact
+							if(curr.get_g_current_time_value() > g_timed_goals[i].second[j].second) {
+								op_valid = false;
+								/* cout << "The action " << op->get_name() << " needs the value " <<
+										g_timed_goals[i].second[j].first.first << "," <<
+										g_timed_goals[i].second[j].first.second << " at " <<
+										g_timed_goals[i].second[j].second << "." << endl;
+								cout << "The current time is " << curr.get_g_current_time_value() <<
+										". Therefore, this search branch will not continue." << endl;
+										*/
+							}
 						}
 					}
 				}
 			}
-		} else {
-			cout << "Error during temporal goals temporal soundness check" << endl;
 		}
-
 
 		if (!op_valid){
 			it = ops.erase(it);
