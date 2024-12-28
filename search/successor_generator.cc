@@ -196,9 +196,9 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 
 				break;
 			}
-		}else if(op->get_name().find("_start") != string::npos)
+		} else if(op->get_name().find("_start") != string::npos)
 		{
-			// Get the duration calculating the costfrom the current state
+			// Get the duration calculating the cost from the current state
 			vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
 			for(; it_pp != op->get_pre_post().end(); ++it_pp) {
 				PrePost pp = *it_pp;

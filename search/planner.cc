@@ -394,7 +394,7 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 
 
     }
-    outfile << "Cost: " <<  plan_cost << endl;
+    outfile << "Total-time Cost: " <<  plan_cost << endl;
     outfile << "Expanded nodes: " << engine->statistics() << endl;
     outfile << "Search time: " << search_time << endl;
     outfile.close();
@@ -405,7 +405,10 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
     constraints_outfile.close();
     if(!g_use_metric)
 	cout << "Plan length: " << plan.size() << " step(s)." << endl;
-    else 
+    else if (!g_use_metric_total_time)
+    	cout << "Plan length: " << plan.size() << " step(s), cost: "
+    		     << plan_cost << "." << endl;
+    else
 	cout << "Plan length: " << plan.size() << " step(s), cost: " 
 	     << plan_cost << "." << endl;
     return cost;
