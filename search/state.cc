@@ -283,9 +283,10 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 			for(int i = 0; i < new_op.get_pre_post().size(); i++) {
 				PrePost pre_post = new_op.get_pre_post()[i];
 				for(int j = 0; j < g_timed_goals.size(); j++) {
-					// pair<int, int> t_goal = g_timed_goals[j].first;
+				    // pair<int, int> t_goal = g_timed_goals[j].first;
 
-					float min_start_action_time = 0.0;
+					float min_start_action_time = -1.0;
+					bool value_changed = false;
 					for(int k = 0; k < g_timed_goals[j].second.size(); k++) {
 						pair<pair<int, int>, float> t_fact = g_timed_goals[j].second[k];
 
@@ -293,31 +294,45 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 						// and get the most restrictive time
 						if((t_fact.first.second != -1) && (pre_post.pre > -1)) {
 							if((t_fact.first.first == pre_post.var) && (t_fact.first.second == pre_post.pre)) {
-								/* cout << "The action " << op.get_name() << " needs the timed fact " <<
+								/* cout << "The action " << new_op.get_name() << " needs the timed fact " <<
 							    	t_fact.first.first << "," << t_fact.first.second << "-" << t_fact.second <<
 										" from the timed goal " << t_goal.first << "," << t_goal.second << endl;
-								cout << "The current time is " << predecessor.get_g_current_time_value() << endl;
-                                */
+								cout << "The current time is " << new_predecessor.get_g_current_time_value() << endl; */
 								if(new_predecessor.get_g_current_time_value() < t_fact.second) {
 									if(min_start_action_time < t_fact.second)
+									{
 										min_start_action_time = t_fact.second;
+										value_changed = true;
+									}
 								}
 							}
 						}
 					}
-					if(min_start_action_time != 0.0) {
-						g_current_time_value = min_start_action_time;
-						op_start_time = min_start_action_time;
-						op_end_time = g_current_time_value + 0.01;
+					if(value_changed) {
+						if(new_op.get_name().find("_start") != string::npos)
+						{
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_start_time;
+						} else {
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_end_time;
+						}
+
 					}
 				}
 			}
 		}
 
-		vector<runn_action>::const_iterator it_ra_const = new_predecessor.running_actions.begin();
-		for(; it_ra_const != new_predecessor.running_actions.end(); it_ra_const++)
+		// If the action added is an start action, we must remove the previous one
+		vector<runn_action>::iterator it_ra_const = this->running_actions.begin();
+		for(; it_ra_const != this->running_actions.end(); )
 		{
-			this->running_actions.push_back(*it_ra_const);
+			if(it_ra_const->non_temporal_action_name == new_op.get_non_temporal_action_name())
+				it_ra_const = this->running_actions.erase(it_ra_const);
+			else
+				it_ra_const++;
 		}
 
 		g_time_value = op_duration;
@@ -363,11 +378,14 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 			}
 		}
 
-		// Copy locked variables
-		vector<blocked_var>::const_iterator it_bv = new_predecessor.blocked_vars.begin();
-		for(; it_bv != new_predecessor.blocked_vars.end(); it_bv++)
+		// If the action added is an start action, we must remove the previous one blocked variables
+		vector<blocked_var>::iterator it_bv = this->blocked_vars.begin();
+		for(; it_bv != this->blocked_vars.end();)
 		{
-			this->blocked_vars.push_back(*it_bv);
+			if(it_bv->non_temporal_action_name == new_op.get_non_temporal_action_name())
+				it_bv = this->blocked_vars.erase(it_bv);
+			else
+				it_bv++;
 		}
 
 		// Now update the locked variables, the operation is different for start and end actions
@@ -520,6 +538,7 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     	}
     if (g_use_metric) // if using action costs, all costs have been increased by 1
 		g_value = g_value - 1;
+
 }
 
 /* State::State(const State &origin)
@@ -577,7 +596,7 @@ State::State(const State &predecessor, const Operator &op)
 						op_duration = predecessor.calculate_runtime_efect<float>(pp.runtime_cost_effect);
 						if(op_duration == 0)
 							op_duration = 0.01;
-					} else{
+					} else {
 						op_duration = pp.f_cost;
 						if(op_duration == 0)
 							op_duration = 0.01;
@@ -586,7 +605,7 @@ State::State(const State &predecessor, const Operator &op)
 					break;
 				}
 			}
-		}else{
+		} else {
 			// Get the duration from the running action
 			vector<runn_action>::const_iterator it_ra_const = predecessor.running_actions.begin();
 			for(; (it_ra_const != predecessor.running_actions.end()) && (op_duration == 0); it_ra_const++){
@@ -676,9 +695,10 @@ State::State(const State &predecessor, const Operator &op)
 			for(int i = 0; i < op.get_pre_post().size(); i++) {
 				PrePost pre_post = op.get_pre_post()[i];
 				for(int j = 0; j < g_timed_goals.size(); j++) {
-					// pair<int, int> t_goal = g_timed_goals[j].first;
+				    // pair<int, int> t_goal = g_timed_goals[j].first;
 
-					float min_start_action_time = 0.0;
+					float min_start_action_time = -1.0;
+					bool value_changed = false;
 					for(int k = 0; k < g_timed_goals[j].second.size(); k++) {
 						pair<pair<int, int>, float> t_fact = g_timed_goals[j].second[k];
 
@@ -689,19 +709,29 @@ State::State(const State &predecessor, const Operator &op)
 								/* cout << "The action " << op.get_name() << " needs the timed fact " <<
 							    	t_fact.first.first << "," << t_fact.first.second << "-" << t_fact.second <<
 										" from the timed goal " << t_goal.first << "," << t_goal.second << endl;
-								cout << "The current time is " << predecessor.get_g_current_time_value() << endl;
-                                */
+								cout << "The current time is " << predecessor.get_g_current_time_value() << endl; */
 								if(predecessor.get_g_current_time_value() < t_fact.second) {
 									if(min_start_action_time < t_fact.second)
+									{
 										min_start_action_time = t_fact.second;
+										value_changed = true;
+									}
 								}
 							}
 						}
 					}
-					if(min_start_action_time != 0.0) {
-						g_current_time_value = min_start_action_time;
-						op_start_time = min_start_action_time;
-						op_end_time = g_current_time_value + 0.01;
+					if(value_changed) {
+						if(op.get_name().find("_start") != string::npos)
+						{
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_start_time;
+						} else {
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_end_time;
+						}
+
 					}
 				}
 			}
@@ -965,6 +995,17 @@ State::State(const State &predecessor, const Operator &op)
     		g_value = predecessor.get_g_value() + this->calculate_runtime_efect<float>(op.get_runtime_cost()) + 1;
     	}
     }
+
+    /* if (g_use_metric_total_time){
+    	if (this->get_g_current_time_value() != predecessor.get_g_current_time_value() + op_duration)
+    	{
+    		if(op.get_name() == "go_to_end stringd_pebd stringd_compuestos robin") {
+        		cout << "Maybe something is wrong: " << this->get_g_current_time_value() << " != " <<
+    			   predecessor.get_g_current_time_value() + op_duration << endl;
+        		cout << " ";
+    		}
+    	}
+    }*/
 
     applied_actions = predecessor.applied_actions + 1;
     applied_actions_vec = predecessor.applied_actions_vec;
