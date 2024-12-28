@@ -69,8 +69,9 @@ typedef struct{
 
 extern bool g_use_metric;
 extern bool g_length_metric;
+extern bool g_use_metric_total_time;
 extern string g_op_metric;
-extern vector<int> g_n_metric;
+extern vector<string> g_n_metric;
 extern vector<string> g_variable_name;
 extern vector<int> g_variable_domain;
 extern vector<int> g_axiom_layers;

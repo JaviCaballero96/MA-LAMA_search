@@ -66,7 +66,8 @@ void read_metric(istream &in) {
 	  in >> metric_aux;
 	  if (metric_aux == "end")
 		  break;
-	  g_n_metric.push_back(atoi(metric_aux.c_str()));
+	  metric_aux = "var" + metric_aux;
+	  g_n_metric.push_back(metric_aux);
   }
   check_magic(in, "end_metric");
 }
@@ -195,6 +196,13 @@ void read_everything(istream &in, bool generate_landmarks, bool reasonable_order
     read_timed_goals(in);
     read_operators(in);
     read_axioms(in);
+
+    if((g_n_metric.size() == 1)) {
+    	if(g_n_metric[0] == total_time_var) {
+    		g_use_metric_total_time = true;
+    	}
+    }
+
     check_magic(in, "begin_SG");
     g_successor_generator = read_successor_generator(in);
     check_magic(in, "end_SG");
@@ -523,8 +531,9 @@ void read_ext_init_state()
 
 bool g_use_metric;
 bool g_length_metric;
+bool g_use_metric_total_time;
 string g_op_metric;
-vector <int> g_n_metric;
+vector <string> g_n_metric;
 vector<string> g_variable_name;
 vector<int> g_variable_domain;
 vector<int> g_axiom_layers;

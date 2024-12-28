@@ -115,12 +115,6 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     reached_lms = new_predecessor.reached_lms; // Can this be a problem?
     reached_lms_cost = new_predecessor.reached_lms_cost;
     update_reached_lms(new_op);
-    if(g_length_metric)
-    	g_value = new_predecessor.get_g_value() + 2;
-    else
-    	g_value = new_predecessor.get_g_value() + new_op.get_cost();
-    if (g_use_metric) // if using action costs, all costs have been increased by 1
-		g_value = g_value - 1;
 
 	float op_duration = 0;
 	float op_end_time = 0;
@@ -465,15 +459,20 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 		if(pre_post.does_fire(new_predecessor)){
 			switch(pre_post.pre){
 			case -2:{
-				vars[pre_post.var] = pre_post.post;
-				float cal_cost = 0;
-				if (!pre_post.have_runtime_cost_effect){
-					numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + pre_post.f_cost;
-				    cal_cost = pre_post.f_cost;
+				if(g_variable_name[pre_post.var] == total_time_var) {
+					numeric_vars_val[pre_post.var] = this->get_g_current_time_value();
 				}
-				else{
-					cal_cost = new_predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
-					numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + cal_cost;
+				else {
+					vars[pre_post.var] = pre_post.post;
+					float cal_cost = 0;
+					if (!pre_post.have_runtime_cost_effect){
+						numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + pre_post.f_cost;
+						cal_cost = pre_post.f_cost;
+					}
+					else{
+						cal_cost = new_predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+						numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + cal_cost;
+					}
 				}
 
 				break;
@@ -508,6 +507,19 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     applied_actions = new_predecessor.applied_actions + 1;
     applied_actions_vec = new_predecessor.applied_actions_vec;
     applied_actions_vec.push_back(new_op.get_name());
+
+    if(g_length_metric)
+    	g_value = new_predecessor.get_g_value() + 2;
+    else if (g_use_metric_total_time)
+    	g_value = this->get_g_current_time_value() + 1;
+    else
+    	if (!new_op.get_have_runtime_cost())
+        	g_value = new_predecessor.get_g_value() + new_op.get_cost();
+    	else {
+    		g_value = new_predecessor.get_g_value() + this->calculate_runtime_efect<float>(new_op.get_runtime_cost()) + 1;
+    	}
+    if (g_use_metric) // if using action costs, all costs have been increased by 1
+		g_value = g_value - 1;
 }
 
 /* State::State(const State &origin)
@@ -891,15 +903,20 @@ State::State(const State &predecessor, const Operator &op)
 		if(pre_post.does_fire(predecessor)){
 			switch(pre_post.pre){
 			case -2:{
-				vars[pre_post.var] = pre_post.post;
-				float cal_cost = 0;
-				if (!pre_post.have_runtime_cost_effect){
-					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + pre_post.f_cost;
-				    cal_cost = pre_post.f_cost;
+				if(g_variable_name[pre_post.var] == total_time_var) {
+					numeric_vars_val[pre_post.var] = this->get_g_current_time_value();
 				}
-				else{
-					cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
-					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + cal_cost;
+				else {
+					vars[pre_post.var] = pre_post.post;
+					float cal_cost = 0;
+					if (!pre_post.have_runtime_cost_effect){
+						numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + pre_post.f_cost;
+						cal_cost = pre_post.f_cost;
+					}
+					else{
+						cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+						numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + cal_cost;
+					}
 				}
 
 				break;
@@ -939,6 +956,8 @@ State::State(const State &predecessor, const Operator &op)
     // Update g_value
     if(g_length_metric)
     	g_value = predecessor.get_g_value() + 2;
+    else if (g_use_metric_total_time)
+    	g_value = this->get_g_current_time_value() + 1;
     else {
     	if (!op.get_have_runtime_cost())
         	g_value = predecessor.get_g_value() + op.get_cost();
