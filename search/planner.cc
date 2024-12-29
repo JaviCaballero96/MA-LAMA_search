@@ -31,6 +31,7 @@
 #include "landmarks_graph_rpg_sasp.h"
 #include "landmarks_count_heuristic.h"
 
+#include <map>
 #include <limits>
 #include <filesystem>
 #include <cassert>
@@ -58,6 +59,10 @@ void print_vars_end_state(ofstream& state_outfile, vector<int> vars_end_state, v
 void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators, 
 			   bool landmarks_heuristic, 
 			   bool landmarks_heuristic_preferred_operators);
+void save_plan_timelines(const vector<const Operator *> &plan, const float cost, const string& filename,
+		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info,
+		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state,
+		vector<vector<blocked_var> > blocked_vars_info, float search_time);
 
 int main(int argc, const char **argv) {
     struct tms start, search_start, search_end;
@@ -259,18 +264,23 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
     ofstream state_outfile;
     string constraints_outfile_name = "current_constraints";
     ofstream constraints_outfile;
+    string modified_filename = "";
     float plan_cost = 0;
     bool separate_outfiles = false; // IPC conditions, change to false for a single outfile.
+
     if(separate_outfiles) {
-	// Write a separat output file for each plan found by iterative search
-	stringstream it_no;
-	it_no << iteration;
-	outfile.open((filename + "." + it_no.str()).c_str(), ios::out);
+		// Write a separate output file for each plan found by iterative search
+		stringstream it_no;
+		it_no << iteration;
+		outfile.open((filename + "." + it_no.str()).c_str(), ios::out);
+		modified_filename = filename + "." + it_no.str();
     }
     else {
-	// Write newest plan always to same output file
-	outfile.open((filename + ".1").c_str(), ios::out);
+		// Write newest plan always to same output file
+		outfile.open((filename + ".1").c_str(), ios::out);
+		modified_filename = filename + ".1";
     }
+
     remove(state_outfile_name.c_str());
     state_outfile.open(state_outfile_name.c_str(), ios::out);
     remove(constraints_outfile_name.c_str());
@@ -411,6 +421,10 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
     else
 	cout << "Plan length: " << plan.size() << " step(s), cost: " 
 	     << plan_cost << "." << endl;
+
+    save_plan_timelines(plan, cost, modified_filename, iteration, plan_temporal_info, plan_duration_info,
+    		plan_cost_info, vars_end_state, num_vars_end_state, blocked_vars_info, search_time);
+
     return cost;
 }
 
@@ -587,4 +601,64 @@ void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators,
 	    cout << "with preferred operators";
 	cout << endl;
     }
+}
+
+void save_plan_timelines(const vector<const Operator *> &plan, const float cost, const string& filename,
+		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info,
+		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state,
+		vector<vector<blocked_var> > blocked_vars_info, float search_time) {
+
+	string timelines_filename = filename + "_plan_timelines" ;
+    ofstream outfile;
+    std::map<int, vector<pair<pair<int, int>, double> > > m_variable_transitions;
+
+    cout << timelines_filename << endl;
+    remove(timelines_filename.c_str());
+    outfile.open(timelines_filename.c_str(), ios::out);
+
+	for(int i = 0; i < plan.size(); i++) {
+		float action_init_time = plan_temporal_info[i];
+		// float action_duration_time= plan_duration_info[i];
+
+		/* Check if sharerd vars have been modified */
+		const std::vector<PrePost> prepost = plan[i]->get_pre_post();
+
+		/* Store changes for each variable in a dictionary */
+		for(int j = 0; j < prepost.size(); j++) {
+
+			if(prepost[j].pre <= -2) {
+				continue;
+			}
+
+			if(m_variable_transitions.find(prepost[j].var) == m_variable_transitions.end()) {
+
+				// Add new variable timeline
+				m_variable_transitions[prepost[j].var] = *(new vector<pair<pair<int, int>, double> >());
+				m_variable_transitions[prepost[j].var].push_back(make_pair(make_pair(prepost[j].pre,
+						prepost[j].post), action_init_time));
+
+			} else {
+				// Add a new state change to the existing timeline
+				m_variable_transitions[prepost[j].var].push_back(make_pair(make_pair(prepost[j].pre,
+						prepost[j].post), action_init_time));
+			}
+		}
+	}
+
+
+   map<int, vector<pair<pair<int, int>, double> > >::iterator it;
+   for(it=m_variable_transitions.begin(); it!=m_variable_transitions.end(); ++it){
+
+	   outfile << "Timeline for: " << it->first << endl;
+
+	   for(int k = 0; k < it->second.size(); k++) {
+		   outfile << "At " << it->second[k].second << " change from " << it->second[k].first.first <<
+				   " to " << it->second[k].first.second << endl;
+	   }
+   }
+
+   outfile.close();
+
+   return;
+
 }
