@@ -272,13 +272,13 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		// Write a separate output file for each plan found by iterative search
 		stringstream it_no;
 		it_no << iteration;
-		outfile.open((filename + "." + it_no.str()).c_str(), ios::out);
-		modified_filename = filename + "." + it_no.str();
+		outfile.open((filename + ".p" + it_no.str()).c_str(), ios::out);
+		modified_filename = filename + ".t" + it_no.str();
     }
     else {
 		// Write newest plan always to same output file
-		outfile.open((filename + ".1").c_str(), ios::out);
-		modified_filename = filename + ".1";
+		outfile.open((filename + ".p1").c_str(), ios::out);
+		modified_filename = filename + ".t1";
     }
 
     remove(state_outfile_name.c_str());
@@ -652,7 +652,7 @@ void save_plan_timelines(const vector<const Operator *> &plan, const float cost,
 	   outfile << "Timeline for: " << it->first << endl;
 
 	   for(int k = 0; k < it->second.size(); k++) {
-		   outfile << "At " << it->second[k].second << " change from " << it->second[k].first.first <<
+		   outfile << "		At " << it->second[k].second << " change from " << it->second[k].first.first <<
 				   " to " << it->second[k].first.second << endl;
 	   }
    }
