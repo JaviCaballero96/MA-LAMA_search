@@ -44,6 +44,8 @@
 #include <string>
 #include <cstring>
 #include <algorithm>
+#include <iostream>
+#include <iomanip>
 
 using namespace std;
 
@@ -52,7 +54,7 @@ bool use_hard_temporal_constraints = false;
 float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
 		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info, vector<float> plan_cost_info,
 		vector<int> vars_end_state, vector<float> num_vars_end_state, vector<vector<blocked_var> > blocked_vars_info,
-		BestFirstSearchEngine* engine, float search_time);
+		BestFirstSearchEngine* engine, float search_time, string agent_name);
 void print_previous_constraints(ofstream& constraints_outfile);
 void print_vars_end_state(ofstream& state_outfile, vector<int> vars_end_state, vector<float> num_vars_end_state);
 
@@ -70,7 +72,7 @@ int main(int argc, const char **argv) {
     times(&start);
     bool poly_time_method = false;
     string plan_filename = "sas_plan";
-    string name = "";
+    string agent_name = "";
     
     bool ff_heuristic = false, ff_preferred_operators = false;
     bool landmarks_heuristic = false, landmarks_preferred_operators = false;
@@ -116,7 +118,7 @@ int main(int argc, const char **argv) {
 
     fs.open (argv[2], std::fstream::in);
 
-    fs >> name;
+    fs >> agent_name;
 
     if(!ff_heuristic && !landmarks_heuristic) {
 	cerr << "Error: you must select at least one heuristic!" << endl
@@ -223,7 +225,7 @@ int main(int argc, const char **argv) {
 			plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no,
 					engine->get_plan_temporal_info(), engine->get_plan_duration_info(), engine->get_plan_cost_info(),
 					engine->get_end_state(), engine->get_num_end_state(), engine->get_blocked_vars_info(),
-					engine, total_ms / 1000.0);
+					engine, total_ms / 1000.0, agent_name);
 
 		engine->statistics();
 
@@ -258,8 +260,9 @@ int main(int argc, const char **argv) {
 float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
 		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info,
 		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state,
-		vector<vector<blocked_var> > blocked_vars_info, BestFirstSearchEngine* engine, float search_time) {
-    ofstream outfile;
+		vector<vector<blocked_var> > blocked_vars_info, BestFirstSearchEngine* engine, float search_time,
+		string agent_name) {
+    ofstream outfile, agent_outfile;
     string state_outfile_name = "end_state";
     ofstream state_outfile;
     string constraints_outfile_name = "current_constraints";
@@ -273,11 +276,13 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		stringstream it_no;
 		it_no << iteration;
 		outfile.open((filename + ".p" + it_no.str()).c_str(), ios::out);
+		agent_outfile.open((agent_name + "_" + it_no.str()).c_str(), ios::out);
 		modified_filename = filename + ".t" + it_no.str();
     }
     else {
 		// Write newest plan always to same output file
 		outfile.open((filename + ".p1").c_str(), ios::out);
+		agent_outfile.open(("plan_" + agent_name + ".txt").c_str(), ios::out);
 		modified_filename = filename + ".t1";
     }
 
@@ -400,7 +405,13 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		}
 
 		outfile << action_duration_time << " " << action_init_time << " " << "(" << plan[i]->get_name() << ") " << action_cost << endl;
-		// constraints_outfile << action_init_time << " " << (action_init_time + block_var_duration) << " " << shared_str << endl;
+		if(plan[i]->get_name().find("_start") != string::npos) {
+			string print_name = plan[i]->get_name();
+			print_name.erase(print_name.find("_start"), strlen("_start"));
+			agent_outfile << fixed << setprecision(3) << setfill(' ');
+			agent_outfile << print_name << " [" << action_init_time << ", " << action_init_time << ", " << action_duration_time  << "]" << endl;
+		}
+			// constraints_outfile << action_init_time << " " << (action_init_time + block_var_duration) << " " << shared_str << endl;
 
 
     }
