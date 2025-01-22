@@ -115,16 +115,11 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     reached_lms = new_predecessor.reached_lms; // Can this be a problem?
     reached_lms_cost = new_predecessor.reached_lms_cost;
     update_reached_lms(new_op);
-    if(g_length_metric)
-    	g_value = new_predecessor.get_g_value() + 2;
-    else
-    	g_value = new_predecessor.get_g_value() + new_op.get_cost();
-    if (g_use_metric) // if using action costs, all costs have been increased by 1
-		g_value = g_value - 1;
 
 	float op_duration = 0;
 	float op_end_time = 0;
 	float op_start_time = new_predecessor.g_current_time_value;
+
     if(!is_temporal)
     {
     	op_end_time = op_start_time + 0.01;
@@ -282,10 +277,62 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 			}
 		}
 
-		vector<runn_action>::const_iterator it_ra_const = new_predecessor.running_actions.begin();
-		for(; it_ra_const != new_predecessor.running_actions.end(); it_ra_const++)
+		// We need to check if any of the preconditions needed by the action is
+		// associated to a timed goal
+		if(g_timed_goals.size() != 0) {
+			for(int i = 0; i < new_op.get_pre_post().size(); i++) {
+				PrePost pre_post = new_op.get_pre_post()[i];
+				for(int j = 0; j < g_timed_goals.size(); j++) {
+				    // pair<int, int> t_goal = g_timed_goals[j].first;
+
+					float min_start_action_time = -1.0;
+					bool value_changed = false;
+					for(int k = 0; k < g_timed_goals[j].second.size(); k++) {
+						pair<pair<int, int>, float> t_fact = g_timed_goals[j].second[k];
+
+						//For each timed fact in timed goals, check if the fact is needed by the action
+						// and get the most restrictive time
+						if((t_fact.first.second != -1) && (pre_post.pre > -1)) {
+							if((t_fact.first.first == pre_post.var) && (t_fact.first.second == pre_post.pre)) {
+								/* cout << "The action " << new_op.get_name() << " needs the timed fact " <<
+							    	t_fact.first.first << "," << t_fact.first.second << "-" << t_fact.second <<
+										" from the timed goal " << t_goal.first << "," << t_goal.second << endl;
+								cout << "The current time is " << new_predecessor.get_g_current_time_value() << endl; */
+								if(new_predecessor.get_g_current_time_value() < t_fact.second) {
+									if(min_start_action_time < t_fact.second)
+									{
+										min_start_action_time = t_fact.second;
+										value_changed = true;
+									}
+								}
+							}
+						}
+					}
+					if(value_changed) {
+						if(new_op.get_name().find("_start") != string::npos)
+						{
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_start_time;
+						} else {
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_end_time;
+						}
+
+					}
+				}
+			}
+		}
+
+		// If the action added is an start action, we must remove the previous one
+		vector<runn_action>::iterator it_ra_const = this->running_actions.begin();
+		for(; it_ra_const != this->running_actions.end(); )
 		{
-			this->running_actions.push_back(*it_ra_const);
+			if(it_ra_const->non_temporal_action_name == new_op.get_non_temporal_action_name())
+				it_ra_const = this->running_actions.erase(it_ra_const);
+			else
+				it_ra_const++;
 		}
 
 		g_time_value = op_duration;
@@ -331,11 +378,14 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 			}
 		}
 
-		// Copy locked variables
-		vector<blocked_var>::const_iterator it_bv = new_predecessor.blocked_vars.begin();
-		for(; it_bv != new_predecessor.blocked_vars.end(); it_bv++)
+		// If the action added is an start action, we must remove the previous one blocked variables
+		vector<blocked_var>::iterator it_bv = this->blocked_vars.begin();
+		for(; it_bv != this->blocked_vars.end();)
 		{
-			this->blocked_vars.push_back(*it_bv);
+			if(it_bv->non_temporal_action_name == new_op.get_non_temporal_action_name())
+				it_bv = this->blocked_vars.erase(it_bv);
+			else
+				it_bv++;
 		}
 
 		// Now update the locked variables, the operation is different for start and end actions
@@ -369,6 +419,50 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 					it_pb++;
 			}
 		}
+
+	    // Copy the values for the already attained temporal goals
+		for(int i = 0; i < new_predecessor.timed_goals_obtained.size(); i++) {
+			this->timed_goals_obtained.push_back(new_predecessor.timed_goals_obtained[i]);
+		}
+
+		// Check if a new temporal goal is being obtained
+		// No temporally invalid action should reach this point
+		for(int i = 0; i < g_timed_goals.size(); i++) {
+			int gt_var = g_timed_goals[i].first.first;
+			int gt_val = g_timed_goals[i].first.second;
+			bool gt_already_obtained = false;
+			for(int j = 0; j < this->timed_goals_obtained.size(); j++) {
+				if((this->timed_goals_obtained[j].first == gt_var) &&
+						(this->timed_goals_obtained[j].second == gt_val)) {
+					gt_already_obtained = true;
+					break;
+				}
+			}
+
+			// If the goal has not been already obtained,
+			// then check if it is attained by the effects of the applied action
+			if(!gt_already_obtained){
+				for(int j = 0; j < new_op.get_pre_post().size(); j++) {
+					PrePost pre_post = new_op.get_pre_post()[j];
+					if(pre_post.pre >= -1){
+						// We already now it has not been attained,
+						// just check if the effect is a temporal goal
+
+						// bool eff_goal = false;
+						for(int k = 0; k < g_timed_goals.size(); k++) {
+							if((pre_post.var == g_timed_goals[k].first.first) &&
+									(pre_post.post == g_timed_goals[k].first.second)) {
+								/* cout << "The temporal goal " << pre_post.var << "-" <<
+										pre_post.post << " is attained by the action " <<
+										new_op.get_name() << endl; */
+								timed_goals_obtained.push_back(make_pair(pre_post.var, pre_post.post));
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
     }
 
     this->numeric_vars_val.clear();
@@ -383,15 +477,20 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 		if(pre_post.does_fire(new_predecessor)){
 			switch(pre_post.pre){
 			case -2:{
-				vars[pre_post.var] = pre_post.post;
-				float cal_cost = 0;
-				if (!pre_post.have_runtime_cost_effect){
-					numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + pre_post.f_cost;
-				    cal_cost = pre_post.f_cost;
+				if(g_variable_name[pre_post.var] == total_time_var) {
+					numeric_vars_val[pre_post.var] = this->get_g_current_time_value();
 				}
-				else{
-					cal_cost = new_predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
-					numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + cal_cost;
+				else {
+					vars[pre_post.var] = pre_post.post;
+					float cal_cost = 0;
+					if (!pre_post.have_runtime_cost_effect){
+						numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + pre_post.f_cost;
+						cal_cost = pre_post.f_cost;
+					}
+					else{
+						cal_cost = new_predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+						numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + cal_cost;
+					}
 				}
 
 				break;
@@ -426,6 +525,20 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     applied_actions = new_predecessor.applied_actions + 1;
     applied_actions_vec = new_predecessor.applied_actions_vec;
     applied_actions_vec.push_back(new_op.get_name());
+
+    if(g_length_metric)
+    	g_value = new_predecessor.get_g_value() + 2;
+    else if (g_use_metric_total_time)
+    	g_value = this->get_g_current_time_value() + 1;
+    else
+    	if (!new_op.get_have_runtime_cost())
+        	g_value = new_predecessor.get_g_value() + new_op.get_cost();
+    	else {
+    		g_value = new_predecessor.get_g_value() + this->calculate_runtime_efect<float>(new_op.get_runtime_cost()) + 1;
+    	}
+    if (g_use_metric) // if using action costs, all costs have been increased by 1
+		g_value = g_value - 1;
+
 }
 
 /* State::State(const State &origin)
@@ -468,7 +581,8 @@ State::State(const State &predecessor, const Operator &op)
 	float op_duration = 0;
 	float op_end_time = 0;
 	float op_start_time = predecessor.g_current_time_value;
-    if(is_temporal){
+
+	if(is_temporal){
 		// Get action duration
 		if(op.get_name().find("_start") != string::npos){
 			// Get the duration calculating the costfrom the current state
@@ -482,7 +596,7 @@ State::State(const State &predecessor, const Operator &op)
 						op_duration = predecessor.calculate_runtime_efect<float>(pp.runtime_cost_effect);
 						if(op_duration == 0)
 							op_duration = 0.01;
-					} else{
+					} else {
 						op_duration = pp.f_cost;
 						if(op_duration == 0)
 							op_duration = 0.01;
@@ -491,7 +605,7 @@ State::State(const State &predecessor, const Operator &op)
 					break;
 				}
 			}
-		}else{
+		} else {
 			// Get the duration from the running action
 			vector<runn_action>::const_iterator it_ra_const = predecessor.running_actions.begin();
 			for(; (it_ra_const != predecessor.running_actions.end()) && (op_duration == 0); it_ra_const++){
@@ -570,6 +684,54 @@ State::State(const State &predecessor, const Operator &op)
 								}
 							}
 						}
+					}
+				}
+			}
+		}
+
+		// We need to check if any of the preconditions needed by the action is
+		// associated to a timed goal
+		if(g_timed_goals.size() != 0) {
+			for(int i = 0; i < op.get_pre_post().size(); i++) {
+				PrePost pre_post = op.get_pre_post()[i];
+				for(int j = 0; j < g_timed_goals.size(); j++) {
+				    // pair<int, int> t_goal = g_timed_goals[j].first;
+
+					float min_start_action_time = -1.0;
+					bool value_changed = false;
+					for(int k = 0; k < g_timed_goals[j].second.size(); k++) {
+						pair<pair<int, int>, float> t_fact = g_timed_goals[j].second[k];
+
+						//For each timed fact in timed goals, check if the fact is needed by the action
+						// and get the most restrictive time
+						if((t_fact.first.second != -1) && (pre_post.pre > -1)) {
+							if((t_fact.first.first == pre_post.var) && (t_fact.first.second == pre_post.pre)) {
+								/* cout << "The action " << op.get_name() << " needs the timed fact " <<
+							    	t_fact.first.first << "," << t_fact.first.second << "-" << t_fact.second <<
+										" from the timed goal " << t_goal.first << "," << t_goal.second << endl;
+								cout << "The current time is " << predecessor.get_g_current_time_value() << endl; */
+								if(predecessor.get_g_current_time_value() < t_fact.second) {
+									if(min_start_action_time < t_fact.second)
+									{
+										min_start_action_time = t_fact.second;
+										value_changed = true;
+									}
+								}
+							}
+						}
+					}
+					if(value_changed) {
+						if(op.get_name().find("_start") != string::npos)
+						{
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_start_time;
+						} else {
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_end_time;
+						}
+
 					}
 				}
 			}
@@ -663,6 +825,50 @@ State::State(const State &predecessor, const Operator &op)
 					it_pb++;
 			}
 		}
+
+	    // Copy the values for the already attained temporal goals
+	    for(int i = 0; i < predecessor.timed_goals_obtained.size(); i++) {
+	    	this->timed_goals_obtained.push_back(predecessor.timed_goals_obtained[i]);
+	    }
+
+	    // Check if a new temporal goal is being obtained
+	    // No temporally invalid action should reach this point
+	    for(int i = 0; i < g_timed_goals.size(); i++) {
+	    	int gt_var = g_timed_goals[i].first.first;
+	    	int gt_val = g_timed_goals[i].first.second;
+	    	bool gt_already_obtained = false;
+	    	for(int j = 0; j < this->timed_goals_obtained.size(); j++) {
+	    		if((this->timed_goals_obtained[j].first == gt_var) &&
+	    				(this->timed_goals_obtained[j].second == gt_val)) {
+	    			gt_already_obtained = true;
+	    			break;
+	    		}
+	    	}
+
+	    	// If the goal has not been already obtained,
+	    	// then check if it is attained by the effects of the applied action
+	    	if(!gt_already_obtained){
+	    		for(int j = 0; j < op.get_pre_post().size(); j++) {
+	    			PrePost pre_post = op.get_pre_post()[j];
+	    			if(pre_post.pre >= -1){
+	    				// We already now it has not been attained,
+	    				// just check if the effect is a temporal goal
+
+	    				// bool eff_goal = false;
+	    				for(int k = 0; k < g_timed_goals.size(); k++) {
+	    					if((pre_post.var == g_timed_goals[k].first.first) &&
+	    							(pre_post.post == g_timed_goals[k].first.second)) {
+	    						//cout << "The temporal goal " << pre_post.var << "-" <<
+	    						//		pre_post.post << " is attained by the action " <<
+								//		op.get_name() << endl;
+	    						timed_goals_obtained.push_back(make_pair(pre_post.var, pre_post.post));
+	    						break;
+	    					}
+	    				}
+	    			}
+	    		}
+	    	}
+	    }
     } else
     {
     	op_end_time = op_start_time + 0.01;
@@ -727,15 +933,20 @@ State::State(const State &predecessor, const Operator &op)
 		if(pre_post.does_fire(predecessor)){
 			switch(pre_post.pre){
 			case -2:{
-				vars[pre_post.var] = pre_post.post;
-				float cal_cost = 0;
-				if (!pre_post.have_runtime_cost_effect){
-					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + pre_post.f_cost;
-				    cal_cost = pre_post.f_cost;
+				if(g_variable_name[pre_post.var] == total_time_var) {
+					numeric_vars_val[pre_post.var] = this->get_g_current_time_value();
 				}
-				else{
-					cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
-					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + cal_cost;
+				else {
+					vars[pre_post.var] = pre_post.post;
+					float cal_cost = 0;
+					if (!pre_post.have_runtime_cost_effect){
+						numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + pre_post.f_cost;
+						cal_cost = pre_post.f_cost;
+					}
+					else{
+						cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
+						numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + cal_cost;
+					}
 				}
 
 				break;
@@ -775,6 +986,8 @@ State::State(const State &predecessor, const Operator &op)
     // Update g_value
     if(g_length_metric)
     	g_value = predecessor.get_g_value() + 2;
+    else if (g_use_metric_total_time)
+    	g_value = this->get_g_current_time_value() + 1;
     else {
     	if (!op.get_have_runtime_cost())
         	g_value = predecessor.get_g_value() + op.get_cost();
@@ -782,6 +995,17 @@ State::State(const State &predecessor, const Operator &op)
     		g_value = predecessor.get_g_value() + this->calculate_runtime_efect<float>(op.get_runtime_cost()) + 1;
     	}
     }
+
+    /* if (g_use_metric_total_time){
+    	if (this->get_g_current_time_value() != predecessor.get_g_current_time_value() + op_duration)
+    	{
+    		if(op.get_name() == "go_to_end stringd_pebd stringd_compuestos robin") {
+        		cout << "Maybe something is wrong: " << this->get_g_current_time_value() << " != " <<
+    			   predecessor.get_g_current_time_value() + op_duration << endl;
+        		cout << " ";
+    		}
+    	}
+    }*/
 
     applied_actions = predecessor.applied_actions + 1;
     applied_actions_vec = predecessor.applied_actions_vec;

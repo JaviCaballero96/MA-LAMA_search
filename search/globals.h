@@ -69,8 +69,9 @@ typedef struct{
 
 extern bool g_use_metric;
 extern bool g_length_metric;
+extern bool g_use_metric_total_time;
 extern string g_op_metric;
-extern vector<int> g_n_metric;
+extern vector<string> g_n_metric;
 extern vector<string> g_variable_name;
 extern vector<int> g_variable_domain;
 extern vector<int> g_axiom_layers;
@@ -82,6 +83,7 @@ extern vector<pair<string, float> > external_init_state_numeric_vars;
 
 extern State *g_initial_state;
 extern vector<pair<int, int> > g_goal;
+extern vector<pair<pair<int, int>, vector<pair<pair<int, int>, double > > > > g_timed_goals;
 extern vector<pair<string, int> > g_shared_vars;
 extern vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
 extern vector<Operator> g_operators;

@@ -231,6 +231,7 @@ void BestFirstSearchEngine::generate_successors(const State *parent_ptr) {
     if(is_temporal){
 		check_var_locks_validity(current_state, all_operators);
 		check_temporal_soundness_validity(current_state, all_operators);
+		check_temporal_goals_validity(current_state, all_operators);
     }
     check_external_locks_validity(current_state, all_operators);
 

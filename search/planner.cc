@@ -31,6 +31,7 @@
 #include "landmarks_graph_rpg_sasp.h"
 #include "landmarks_count_heuristic.h"
 
+#include <map>
 #include <limits>
 #include <filesystem>
 #include <cassert>
@@ -43,6 +44,8 @@
 #include <string>
 #include <cstring>
 #include <algorithm>
+#include <iostream>
+#include <iomanip>
 
 using namespace std;
 
@@ -51,13 +54,17 @@ bool use_hard_temporal_constraints = false;
 float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
 		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info, vector<float> plan_cost_info,
 		vector<int> vars_end_state, vector<float> num_vars_end_state, vector<vector<blocked_var> > blocked_vars_info,
-		BestFirstSearchEngine* engine, float search_time);
+		BestFirstSearchEngine* engine, float search_time, string agent_name);
 void print_previous_constraints(ofstream& constraints_outfile);
 void print_vars_end_state(ofstream& state_outfile, vector<int> vars_end_state, vector<float> num_vars_end_state);
 
 void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators, 
 			   bool landmarks_heuristic, 
 			   bool landmarks_heuristic_preferred_operators);
+void save_plan_timelines(const vector<const Operator *> &plan, const float cost, const string& filename,
+		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info,
+		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state,
+		vector<vector<blocked_var> > blocked_vars_info, float search_time);
 
 int main(int argc, const char **argv) {
     struct tms start, search_start, search_end;
@@ -65,7 +72,7 @@ int main(int argc, const char **argv) {
     times(&start);
     bool poly_time_method = false;
     string plan_filename = "sas_plan";
-    string name = "";
+    string agent_name = "";
     
     bool ff_heuristic = false, ff_preferred_operators = false;
     bool landmarks_heuristic = false, landmarks_preferred_operators = false;
@@ -111,7 +118,7 @@ int main(int argc, const char **argv) {
 
     fs.open (argv[2], std::fstream::in);
 
-    fs >> name;
+    fs >> agent_name;
 
     if(!ff_heuristic && !landmarks_heuristic) {
 	cerr << "Error: you must select at least one heuristic!" << endl
@@ -132,6 +139,12 @@ int main(int argc, const char **argv) {
 	generate_landmarks = true;
     times(&landmarks_generation_start);
     read_everything(fs, generate_landmarks, reasonable_orders, read_init_state, read_runtime_constraints);
+
+    if (use_hard_temporal_constraints && (g_timed_goals.size() != 0)) {
+    	cout << "Hard temporal constraints and timed goals are currently not supported at the same time." << endl;
+    	cout << "For specific applications of MA-LAMA that may require these features, please contact the author" << endl;
+    	exit(0);
+    }
     // dump_everything();
     times(&landmarks_generation_end);
     int landmarks_generation_ms = (landmarks_generation_end.tms_utime - 
@@ -212,7 +225,7 @@ int main(int argc, const char **argv) {
 			plan_cost = save_plan(engine->get_plan(), engine->get_plan_cost(), plan_filename, iteration_no,
 					engine->get_plan_temporal_info(), engine->get_plan_duration_info(), engine->get_plan_cost_info(),
 					engine->get_end_state(), engine->get_num_end_state(), engine->get_blocked_vars_info(),
-					engine, total_ms / 1000.0);
+					engine, total_ms / 1000.0, agent_name);
 
 		engine->statistics();
 
@@ -247,24 +260,32 @@ int main(int argc, const char **argv) {
 float save_plan(const vector<const Operator *> &plan, const float cost, const string& filename,
 		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info,
 		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state,
-		vector<vector<blocked_var> > blocked_vars_info, BestFirstSearchEngine* engine, float search_time) {
-    ofstream outfile;
+		vector<vector<blocked_var> > blocked_vars_info, BestFirstSearchEngine* engine, float search_time,
+		string agent_name) {
+    ofstream outfile, agent_outfile;
     string state_outfile_name = "end_state";
     ofstream state_outfile;
     string constraints_outfile_name = "current_constraints";
     ofstream constraints_outfile;
+    string modified_filename = "";
     float plan_cost = 0;
     bool separate_outfiles = false; // IPC conditions, change to false for a single outfile.
+
     if(separate_outfiles) {
-	// Write a separat output file for each plan found by iterative search
-	stringstream it_no;
-	it_no << iteration;
-	outfile.open((filename + "." + it_no.str()).c_str(), ios::out);
+		// Write a separate output file for each plan found by iterative search
+		stringstream it_no;
+		it_no << iteration;
+		outfile.open((filename + ".p" + it_no.str()).c_str(), ios::out);
+		agent_outfile.open((agent_name + "_" + it_no.str()).c_str(), ios::out);
+		modified_filename = filename + ".t" + it_no.str();
     }
     else {
-	// Write newest plan always to same output file
-	outfile.open((filename + ".1").c_str(), ios::out);
+		// Write newest plan always to same output file
+		outfile.open((filename + ".p1").c_str(), ios::out);
+		agent_outfile.open(("plan_" + agent_name + ".txt").c_str(), ios::out);
+		modified_filename = filename + ".t1";
     }
+
     remove(state_outfile_name.c_str());
     state_outfile.open(state_outfile_name.c_str(), ios::out);
     remove(constraints_outfile_name.c_str());
@@ -384,11 +405,17 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		}
 
 		outfile << action_duration_time << " " << action_init_time << " " << "(" << plan[i]->get_name() << ") " << action_cost << endl;
-		// constraints_outfile << action_init_time << " " << (action_init_time + block_var_duration) << " " << shared_str << endl;
+		if(plan[i]->get_name().find("_start") != string::npos) {
+			string print_name = plan[i]->get_name();
+			print_name.erase(print_name.find("_start"), strlen("_start"));
+			agent_outfile << fixed << setprecision(3) << setfill(' ');
+			agent_outfile << print_name << " [" << action_init_time << ", " << action_init_time << ", " << action_duration_time  << "]" << endl;
+		}
+			// constraints_outfile << action_init_time << " " << (action_init_time + block_var_duration) << " " << shared_str << endl;
 
 
     }
-    outfile << "Cost: " <<  plan_cost << endl;
+    outfile << "Total-time Cost: " <<  plan_cost << endl;
     outfile << "Expanded nodes: " << engine->statistics() << endl;
     outfile << "Search time: " << search_time << endl;
     outfile.close();
@@ -399,9 +426,16 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
     constraints_outfile.close();
     if(!g_use_metric)
 	cout << "Plan length: " << plan.size() << " step(s)." << endl;
-    else 
+    else if (!g_use_metric_total_time)
+    	cout << "Plan length: " << plan.size() << " step(s), cost: "
+    		     << plan_cost << "." << endl;
+    else
 	cout << "Plan length: " << plan.size() << " step(s), cost: " 
 	     << plan_cost << "." << endl;
+
+    save_plan_timelines(plan, cost, modified_filename, iteration, plan_temporal_info, plan_duration_info,
+    		plan_cost_info, vars_end_state, num_vars_end_state, blocked_vars_info, search_time);
+
     return cost;
 }
 
@@ -578,4 +612,64 @@ void print_heuristics_used(bool ff_heuristic, bool ff_preferred_operators,
 	    cout << "with preferred operators";
 	cout << endl;
     }
+}
+
+void save_plan_timelines(const vector<const Operator *> &plan, const float cost, const string& filename,
+		int iteration, vector<float> plan_temporal_info, vector<float> plan_duration_info,
+		vector<float> plan_cost_info, vector<int> vars_end_state, vector<float> num_vars_end_state,
+		vector<vector<blocked_var> > blocked_vars_info, float search_time) {
+
+	string timelines_filename = filename + "_plan_timelines" ;
+    ofstream outfile;
+    std::map<int, vector<pair<pair<int, int>, double> > > m_variable_transitions;
+
+    cout << timelines_filename << endl;
+    remove(timelines_filename.c_str());
+    outfile.open(timelines_filename.c_str(), ios::out);
+
+	for(int i = 0; i < plan.size(); i++) {
+		float action_init_time = plan_temporal_info[i];
+		// float action_duration_time= plan_duration_info[i];
+
+		/* Check if sharerd vars have been modified */
+		const std::vector<PrePost> prepost = plan[i]->get_pre_post();
+
+		/* Store changes for each variable in a dictionary */
+		for(int j = 0; j < prepost.size(); j++) {
+
+			if(prepost[j].pre <= -2) {
+				continue;
+			}
+
+			if(m_variable_transitions.find(prepost[j].var) == m_variable_transitions.end()) {
+
+				// Add new variable timeline
+				m_variable_transitions[prepost[j].var] = *(new vector<pair<pair<int, int>, double> >());
+				m_variable_transitions[prepost[j].var].push_back(make_pair(make_pair(prepost[j].pre,
+						prepost[j].post), action_init_time));
+
+			} else {
+				// Add a new state change to the existing timeline
+				m_variable_transitions[prepost[j].var].push_back(make_pair(make_pair(prepost[j].pre,
+						prepost[j].post), action_init_time));
+			}
+		}
+	}
+
+
+   map<int, vector<pair<pair<int, int>, double> > >::iterator it;
+   for(it=m_variable_transitions.begin(); it!=m_variable_transitions.end(); ++it){
+
+	   outfile << "Timeline for: " << it->first << endl;
+
+	   for(int k = 0; k < it->second.size(); k++) {
+		   outfile << "		At " << it->second[k].second << " change from " << it->second[k].first.first <<
+				   " to " << it->second[k].first.second << endl;
+	   }
+   }
+
+   outfile.close();
+
+   return;
+
 }

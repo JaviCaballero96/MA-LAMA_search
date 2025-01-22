@@ -196,9 +196,9 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 
 				break;
 			}
-		}else if(op->get_name().find("_start") != string::npos)
+		} else if(op->get_name().find("_start") != string::npos)
 		{
-			// Get the duration calculating the costfrom the current state
+			// Get the duration calculating the cost from the current state
 			vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
 			for(; it_pp != op->get_pre_post().end(); ++it_pp) {
 				PrePost pp = *it_pp;
@@ -442,6 +442,71 @@ void check_temporal_soundness_validity(
 		}else
 			it++;
 	}
+}
+
+void check_temporal_goals_validity(const State &curr, vector<const Operator *> &ops){
+	// In case the application of an action makes the state miss a temporal goal,
+	// do not propagate this search branch
+
+	vector<const Operator *>::iterator it = ops.begin();
+	for(; it != ops.end();) {
+		const Operator * op = *it;
+		bool op_valid = true;
+
+		// Obtain the end time of the action
+		/* float action_end_time = 0.0;
+		if(op->get_name().find("_end") != string::npos)
+		{
+			vector<runn_action>::const_iterator it_ra_const = curr.running_actions.begin();
+			for(; (it_ra_const != curr.running_actions.end()); it_ra_const++)
+			{
+				if((*it_ra_const).non_temporal_action_name == op->get_non_temporal_action_name())
+				{
+					action_end_time = (*it_ra_const).time_end;
+					break;
+				}
+			}
+
+		} else {
+			action_end_time = curr.get_g_current_time_value() + 0.01;
+		} */
+
+		// If the end_time has been extracted successfully,
+		// check the attained goals and delete operators that provoke invalid states
+		for (int i = 0; i < g_timed_goals.size(); i++) {
+			// Check negative timed literals
+			for (int j = 0; j < g_timed_goals[i].second.size(); j++) {
+				if (g_timed_goals[i].second[j].first.second == -1) {
+					// Check if the variable is needed by the action
+					for (int k = 0; k < op->get_pre_post().size(); k++) {
+						PrePost prepost = op->get_pre_post()[k];
+						if((prepost.pre > -1) && (prepost.var == g_timed_goals[i].second[j].first.first)) {
+							// The var needs to have a certain value by the operator
+							// Check if the application time is later than the negative timed fact
+							if(curr.get_g_current_time_value() > g_timed_goals[i].second[j].second) {
+								op_valid = false;
+								/* cout << "The action " << op->get_name() << " needs the value " <<
+										g_timed_goals[i].second[j].first.first << "," <<
+										g_timed_goals[i].second[j].first.second << " at " <<
+										g_timed_goals[i].second[j].second << "." << endl;
+								cout << "The current time is " << curr.get_g_current_time_value() <<
+										". Therefore, this search branch will not continue." << endl;
+										*/
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (!op_valid){
+			it = ops.erase(it);
+
+		}else
+			it++;
+	}
+
+	return;
 }
 
 void SuccessorGeneratorSwitch::_dump(string indent) {
