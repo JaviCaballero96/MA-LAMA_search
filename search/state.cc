@@ -323,6 +323,49 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 					}
 				}
 			}
+			for(int i = 0; i < new_op.get_prevail().size(); i++) {
+				Prevail prevail = new_op.get_prevail()[i];
+				for(int j = 0; j < g_timed_goals.size(); j++) {
+				    // pair<int, int> t_goal = g_timed_goals[j].first;
+
+					float min_start_action_time = -1.0;
+					bool value_changed = false;
+					for(int k = 0; k < g_timed_goals[j].second.size(); k++) {
+						pair<pair<int, int>, float> t_fact = g_timed_goals[j].second[k];
+
+						//For each timed fact in timed goals, check if the fact is needed by the action
+						// and get the most restrictive time
+						if((t_fact.first.second != -1) && (prevail.prev > -1)) {
+							if((t_fact.first.first == prevail.var) && (t_fact.first.second == prevail.prev)) {
+								/* cout << "The action " << new_op.get_name() << " needs the timed fact " <<
+							    	t_fact.first.first << "," << t_fact.first.second << "-" << t_fact.second <<
+										" from the timed goal " << t_goal.first << "," << t_goal.second << endl;
+								cout << "The current time is " << new_predecessor.get_g_current_time_value() << endl; */
+								if(new_predecessor.get_g_current_time_value() < t_fact.second) {
+									if(min_start_action_time < t_fact.second)
+									{
+										min_start_action_time = t_fact.second;
+										value_changed = true;
+									}
+								}
+							}
+						}
+					}
+					if(value_changed) {
+						if(new_op.get_name().find("_start") != string::npos)
+						{
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_start_time;
+						} else {
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_end_time;
+						}
+
+					}
+				}
+			}
 		}
 
 		// If the action added is an start action, we must remove the previous one
@@ -735,6 +778,49 @@ State::State(const State &predecessor, const Operator &op)
 					}
 				}
 			}
+			for(int i = 0; i < op.get_prevail().size(); i++) {
+							Prevail pevail = op.get_prevail()[i];
+							for(int j = 0; j < g_timed_goals.size(); j++) {
+							    // pair<int, int> t_goal = g_timed_goals[j].first;
+
+								float min_start_action_time = -1.0;
+								bool value_changed = false;
+								for(int k = 0; k < g_timed_goals[j].second.size(); k++) {
+									pair<pair<int, int>, float> t_fact = g_timed_goals[j].second[k];
+
+									//For each timed fact in timed goals, check if the fact is needed by the action
+									// and get the most restrictive time
+									if((t_fact.first.second != -1) && (pevail.prev > -1)) {
+										if((t_fact.first.first == pevail.var) && (t_fact.first.second == pevail.prev)) {
+											/* cout << "The action " << op.get_name() << " needs the timed fact " <<
+										    	t_fact.first.first << "," << t_fact.first.second << "-" << t_fact.second <<
+													" from the timed goal " << t_goal.first << "," << t_goal.second << endl;
+											cout << "The current time is " << predecessor.get_g_current_time_value() << endl; */
+											if(predecessor.get_g_current_time_value() < t_fact.second) {
+												if(min_start_action_time < t_fact.second)
+												{
+													min_start_action_time = t_fact.second;
+													value_changed = true;
+												}
+											}
+										}
+									}
+								}
+								if(value_changed) {
+									if(op.get_name().find("_start") != string::npos)
+									{
+										op_start_time = min_start_action_time;
+										op_end_time = min_start_action_time + op_duration;
+										g_current_time_value = op_start_time;
+									} else {
+										op_start_time = min_start_action_time;
+										op_end_time = min_start_action_time + op_duration;
+										g_current_time_value = op_end_time;
+									}
+
+								}
+							}
+						}
 		}
 
 		vector<runn_action>::const_iterator it_ra_const = predecessor.running_actions.begin();
