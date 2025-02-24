@@ -412,7 +412,6 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 						pre_post->f_cost = new_predecessor.calculate_runtime_efect<float>(pre_post->runtime_cost_effect);
 						running_actions.back().functional_costs.push_back(pre_post);
 					} else if(pre_post->have_module_cost_effect) {
-						cout << pre_post->runtime_cost_effect << endl;
 						pre_post->f_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post->runtime_cost_effect]);
 						running_actions.back().functional_costs.push_back(pre_post);
 					}
@@ -545,7 +544,7 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 						cal_cost = pre_post.f_cost;
 					} else if (pre_post.have_module_cost_effect) {
 						// cout << pre_post.runtime_cost_effect << endl;
-						float cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
+						cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
 						numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + cal_cost;
 					}
 					else{
@@ -562,7 +561,6 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 					numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] - pre_post.f_cost;
 				}
 				else if (pre_post.have_module_cost_effect) {
-					cout << pre_post.runtime_cost_effect << endl;
 					float cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
 					numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] - cal_cost;
 				}
@@ -1078,7 +1076,7 @@ State::State(const State &predecessor, const Operator &op)
 						cal_cost = pre_post.f_cost;
 					} else if(pre_post.have_module_cost_effect) {
 						// cout << pre_post.runtime_cost_effect << endl;
-						float cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
+						cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
 						numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + cal_cost;
 					}
 					else{

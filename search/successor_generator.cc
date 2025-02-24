@@ -218,7 +218,6 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 						op_duration = curr.calculate_runtime_efect<float>(pp.runtime_cost_effect);
 					} else if(pp.have_module_cost_effect)
 					{
-						cout << pp.runtime_cost_effect << endl;
 						op_duration = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pp.runtime_cost_effect]);
 					}
 					else {
