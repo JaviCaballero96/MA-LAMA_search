@@ -108,8 +108,11 @@ void check_functional_validity(
 				PrePost pre_post = *(*it_fc);
 				switch(pre_post.pre){
 					case -2:{
-						if (!pre_post.have_runtime_cost_effect){
+						if (!pre_post.have_runtime_cost_effect && !pre_post.have_module_cost_effect){
 							aux_state->numeric_vars_val[pre_post.var] = aux_state->numeric_vars_val[pre_post.var] + (pre_post.f_cost * peroneage_completed);
+						} else if (pre_post.have_module_cost_effect){
+							aux_state->numeric_vars_val[pre_post.var]  = aux_state->numeric_vars_val[pre_post.var] +
+									(g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]) * peroneage_completed);
 						}
 						else{
 							aux_state->numeric_vars_val[pre_post.var] = aux_state->numeric_vars_val[pre_post.var] +
@@ -119,8 +122,12 @@ void check_functional_validity(
 						break;
 					}
 					case -3:
-						if (!pre_post.have_runtime_cost_effect)
+						if (!pre_post.have_runtime_cost_effect && !pre_post.have_module_cost_effect)
 							aux_state->numeric_vars_val[pre_post.var] = aux_state->numeric_vars_val[pre_post.var] - (pre_post.f_cost * peroneage_completed);
+						else if (pre_post.have_module_cost_effect){
+							aux_state->numeric_vars_val[pre_post.var]  = aux_state->numeric_vars_val[pre_post.var] -
+									(g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]) * peroneage_completed);
+						}
 						else{
 							aux_state->numeric_vars_val[pre_post.var] = aux_state->numeric_vars_val[pre_post.var] -
 									(aux_state->calculate_runtime_efect<float>(pre_post.runtime_cost_effect) * peroneage_completed);
@@ -148,6 +155,8 @@ void check_functional_validity(
 			PrePost pp = *it_pp;
 			if(pp.pre == -5)
 			{
+				// cout << "Checking " << op->get_name() << endl;
+				// cout << aux_state->numeric_vars_val[pp.var] << "<" << pp.f_cost << endl;
 				if (aux_state->numeric_vars_val[pp.var] < pp.f_cost) {
 					op_valid = false;
 					break;
@@ -207,7 +216,12 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 					if(pp.have_runtime_cost_effect)
 					{
 						op_duration = curr.calculate_runtime_efect<float>(pp.runtime_cost_effect);
-					} else {
+					} else if(pp.have_module_cost_effect)
+					{
+						cout << pp.runtime_cost_effect << endl;
+						op_duration = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pp.runtime_cost_effect]);
+					}
+					else {
 						op_duration = pp.f_cost;
 					}
 					break;
@@ -354,7 +368,10 @@ void check_var_locks_validity(
 					if(pp.have_runtime_cost_effect)
 					{
 						op_duration = curr.get_g_current_time_value() + curr.calculate_runtime_efect<float>(pp.runtime_cost_effect);
-					} else{
+					} else if(pp.have_module_cost_effect)
+					{
+						op_duration = curr.get_g_current_time_value() + g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pp.runtime_cost_effect]);
+					}else{
 						op_duration = curr.get_g_current_time_value() + pp.f_cost;
 					}
 

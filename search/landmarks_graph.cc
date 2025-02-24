@@ -315,9 +315,9 @@ bool LandmarksGraph::relaxed_task_solvable(vector<vector<int> >& lvl_var,
     
     // Test whether all goal propositions have a level of less than INT_MAX
     for(int i = 0; i < g_goal.size(); i++)
-	if(lvl_var[g_goal[i].first][g_goal[i].second] == INT_MAX) {
-	    return false;
-	}
+		if(lvl_var[g_goal[i].first][g_goal[i].second] == INT_MAX) {
+			return false;
+		}
     return true;
 }
 

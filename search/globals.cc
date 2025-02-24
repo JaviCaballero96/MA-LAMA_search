@@ -23,12 +23,16 @@
  *********************************************************************/
 
 #include "globals.h"
+#include "external_function.h"
 
 #include <cstdlib>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <fstream>
+#include <dlfcn.h>
+#include <sstream>      // std::stringstream
+//#include "utils/system.h"
 using namespace std;
 
 #include "axioms.h"
@@ -39,6 +43,7 @@ using namespace std;
 #include "landmarks_graph.h"
 #include "landmarks_graph_rpg_sasp.h"
 #include "ff_heuristic.h"
+#include "external_function.h"
 
 void check_magic(istream &in, string magic) {
     string word;
@@ -139,6 +144,34 @@ void read_timed_goals(istream &in) {
   check_magic(in, "end_timed_goals");
 }
 
+void read_modules(istream &in) {
+	check_magic(in, "begin_modules");
+	int m_count;
+	in >> m_count;
+	for(int i = 0; i < m_count; i++) {
+	  string m_name;
+	  in >> m_name;
+	  g_modules.push_back(ExternalFunctionModuleInfo());
+	  g_modules.back().module_name = m_name;
+	  int f_count;
+	  in >> f_count;
+	  for(int j = 0; j < f_count; j++) {
+		  string f_name;
+		  in >> f_name;
+		  g_modules.back().functions.push_back(ExternalFunctionInfo());
+		  g_modules.back().functions.back().name = f_name;
+		  int arg_count;
+		  in >> arg_count;
+		  for(int z = 0; z < arg_count; z++) {
+			  string arg_name, arg_type;
+			  in >> arg_name >> arg_type;
+
+		  }
+	  }
+	}
+	check_magic(in, "end_modules");
+}
+
 void dump_goal() {
     cout << "Goal Conditions:" << endl;
     for(int i = 0; i < g_goal.size(); i++)
@@ -194,6 +227,7 @@ void read_everything(istream &in, bool generate_landmarks, bool reasonable_order
     }
     read_goal(in);
     read_timed_goals(in);
+    read_modules(in);
     read_operators(in);
     read_axioms(in);
 
@@ -213,6 +247,54 @@ void read_everything(istream &in, bool generate_landmarks, bool reasonable_order
 	build_landmarks_graph(reasonable_orders);
     }
     g_initial_state->set_landmarks_for_initial_state();
+}
+
+void load_external_modules()
+{
+	// For each module and function, instantiate and calculate the associated value
+	int mod_index = 0;
+	vector<ExternalFunctionModuleInfo>::iterator it_mod = g_modules.begin();
+	for(; it_mod != g_modules.end(); ++it_mod) {
+
+		// Iterate over the functions
+		vector<ExternalFunctionInfo>::iterator it_func = it_mod->functions.begin();
+		for(; it_func != it_mod->functions.end(); ++it_func) {
+
+			// Iterate over instantiated functions. If match, add it to the object-
+			unordered_map<string, int>::iterator it_inst = g_instantiated_funcs_dict.begin();
+			if(it_func->name == "setup")
+				continue;
+
+			for (; it_inst != g_instantiated_funcs_dict.end(); ++it_inst)
+			{
+				string base_inst_name = it_inst->first.substr(0, it_inst->first.find("("));
+
+				if(base_inst_name == it_func->name) {
+					// Add the instantiation
+
+					it_func->instances.push_back(GroundedExternalFunctionInfo());
+					it_func->instances.back().var = it_inst->second;
+					it_func->instances.back().name = it_inst->first;
+
+					// Read arguments
+					string str_args = it_inst->first;
+					std::string::iterator end_pos = std::remove(str_args.begin(), str_args.end(), ' ');
+					str_args.erase(end_pos, str_args.end());
+					str_args = str_args.substr(str_args.find("(") + 1, str_args.length());
+					str_args = str_args.substr(0, str_args.find(")"));
+					std::stringstream args_stream;
+					args_stream << str_args;
+					std::string arg;
+					while(std::getline(args_stream, arg, ','))
+					{
+						it_func->instances.back().parameters.push_back(arg);
+					}
+				}
+			}
+		}
+		g_ext_func_manager.load_module(*it_mod);
+	}
+
 }
 
 void dump_everything() {
@@ -531,7 +613,7 @@ void read_ext_init_state()
 
 bool g_use_metric;
 bool g_length_metric;
-bool g_use_metric_total_time;
+bool g_use_metric_total_time = false;
 string g_op_metric;
 vector <string> g_n_metric;
 vector<string> g_variable_name;
@@ -543,6 +625,9 @@ State *g_initial_state;
 vector<ext_constraint*> external_blocked_vars;
 vector<pair<int, int> > g_goal;
 vector<pair<pair<int, int>, vector<pair<pair<int, int>, double > > > > g_timed_goals;
+vector<ExternalFunctionModuleInfo> g_modules;
+std::unordered_map<string, int> g_instantiated_funcs_dict;
+ExternalFunctionManager g_ext_func_manager;
 vector<pair<string, int> > g_shared_vars;
 vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
 vector<pair<string, int> > external_init_state_vars;

@@ -54,13 +54,14 @@ struct PrePost {
     int pre, post;
     float f_cost;
     bool have_runtime_cost_effect;
+    bool have_module_cost_effect;
     std::string runtime_cost_effect;
     bool is_conditional_effect;
     std::vector<Prevail> cond;
     PrePost() {} // Needed for axiom file-reading constructor, unfortunately.
     PrePost(std::istream &in);
     PrePost(int v, int pr, int po, float f_co, const std::vector<Prevail> &co)
-	: var(v), pre(pr), post(po), f_cost(f_co), cond(co) {}
+	: var(v), pre(pr), post(po), f_cost(f_co), cond(co), have_runtime_cost_effect(false), is_conditional_effect(false), have_module_cost_effect(false) {}
 
     bool is_applicable(const State &state) const {
 	assert(var >= 0 && var < g_variable_name.size());
@@ -91,6 +92,7 @@ class Operator {
 	std::string non_temporal_name;
     float cost;
     bool have_runtime_cost;
+    bool have_module_cost;
     string runtime_cost;
 public:
     Operator(std::istream &in, bool is_axiom);
@@ -113,6 +115,7 @@ public:
 	return true;
     }
     bool get_have_runtime_cost() const {return have_runtime_cost;};
+    bool get_have_module_cost() const {return have_module_cost;};
     string get_runtime_cost() const {return runtime_cost;};
     string get_non_temporal_action_name() const {return non_temporal_name;};
     float get_cost() const {return cost;};
