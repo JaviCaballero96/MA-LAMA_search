@@ -5,7 +5,8 @@ HEADERS = heuristic.h ff_heuristic.h wa_star_search.h \
 	  search_engine.h open_list.h closed_list.h \
 	  landmarks_graph.h \
 	  landmarks_graph_rpg_sasp.h \
-	  landmarks_count_heuristic.h 
+	  landmarks_count_heuristic.h \
+	  external_function.h 
 
 SOURCES = planner.cc $(HEADERS:%.h=%.cc) exprtk.cc
 OBJECTS = $(SOURCES:%.cc=%.o)
@@ -14,7 +15,7 @@ RELEASE_OBJECTS = $(SOURCES:%.cc=%.release.o)
 
 CC = g++
 DEPEND = g++ -MM
-CCOPT =      -Wall -W -Wno-sign-compare -ansi -pedantic -Wno-deprecated
+CCOPT =      -Wall -W -Wno-sign-compare -ansi -pedantic -Wno-deprecated -std=c++11
 RELEASEOPT = -Wall -W -Wno-sign-compare -ansi -pedantic -DNDEBUG -m32 -Wno-deprecated
 LINKOPT =
 

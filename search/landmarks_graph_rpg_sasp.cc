@@ -180,9 +180,9 @@ int LandmarksGraphNew::min_cost_for_landmark(LandmarkNode* bp,
 	// ...look at all achieving operators
         const vector<int>& ops = get_operators_including_eff(b);
         for (unsigned i = 0; i < ops.size(); i++) {
-	    const Operator& op = get_operator_for_lookup_index(ops[i]);
-	    // and calculate the minimum cost of those that can make
-	    // bp true for the first time according to lvl_var
+			const Operator& op = get_operator_for_lookup_index(ops[i]);
+			// and calculate the minimum cost of those that can make
+			// bp true for the first time according to lvl_var
             if(_possibly_reaches_lm(op, lvl_var, bp)) 
 
             	// TO DO: float
@@ -393,35 +393,35 @@ void LandmarksGraphNew::generate_landmarks() {
 	assert(bp->forward_orders.empty());
 
         if(!bp->is_true_in_state(*g_initial_state)) {
-	    // Backchain from landmark bp and compute greedy necessary predecessors.
-	    // Firstly, collect information about the earliest possible time step in a
-	    // relaxed plan that propositions are achieved (in lvl_var) and operators
-	    // applied (in lvl_ops).
-	    vector<vector<int> > lvl_var;
-            vector<hash_map<pair<int, int>, int, hash_int_pair> > lvl_op;
-	    compute_predecessor_information(bp, lvl_var, lvl_op);
-	    // Use this information to determine all operators that can possibly achieve bp 
-            // for the first time, and collect any precondition propositions that all such 
-	    // operators share (if there are any).
-	    hash_map<int, int> shared_pre;
-	    compute_shared_preconditions(shared_pre, lvl_var, bp);
-	    // All such shared preconditions are landmarks, and greedy necessary predecessors of bp.
-            for(hash_map<int, int>::iterator it = shared_pre.begin(); it != shared_pre.end(); it++){
-            	if ((it->second != -2) && (it->second != -3) && (it->second != -4)  && (it->second != -5)  && (it->second != -6))
-                	found_lm_and_order(*it, *bp, gn);
-            }
-            // Extract additional orders from relaxed planning graph and DTG.
-	    approximate_lookahead_orders(lvl_var, bp);
-	    // Use the information about possibly achieving operators of bp to set its min cost.
-	    bp->min_cost = min_cost_for_landmark(bp, lvl_var);
+			// Backchain from landmark bp and compute greedy necessary predecessors.
+			// Firstly, collect information about the earliest possible time step in a
+			// relaxed plan that propositions are achieved (in lvl_var) and operators
+			// applied (in lvl_ops).
+			vector<vector<int> > lvl_var;
+				vector<hash_map<pair<int, int>, int, hash_int_pair> > lvl_op;
+			compute_predecessor_information(bp, lvl_var, lvl_op);
+			// Use this information to determine all operators that can possibly achieve bp
+				// for the first time, and collect any precondition propositions that all such
+			// operators share (if there are any).
+			hash_map<int, int> shared_pre;
+			compute_shared_preconditions(shared_pre, lvl_var, bp);
+			// All such shared preconditions are landmarks, and greedy necessary predecessors of bp.
+				for(hash_map<int, int>::iterator it = shared_pre.begin(); it != shared_pre.end(); it++){
+					if ((it->second != -2) && (it->second != -3) && (it->second != -4)  && (it->second != -5)  && (it->second != -6))
+						found_lm_and_order(*it, *bp, gn);
+				}
+				// Extract additional orders from relaxed planning graph and DTG.
+			approximate_lookahead_orders(lvl_var, bp);
+			// Use the information about possibly achieving operators of bp to set its min cost.
+			bp->min_cost = min_cost_for_landmark(bp, lvl_var);
 
-	    // Process achieving operators again to find disj. LMs
-	    vector<set<pair<int, int> > > disjunctive_pre;
-	    compute_disjunctive_preconditions(disjunctive_pre, lvl_var, bp);
-	    for(int i = 0; i < disjunctive_pre.size(); i++)
-		if(disjunctive_pre[i].size() < 5) { // We don't want disj. LMs to get too big
-		    found_disj_lm_and_order(disjunctive_pre[i], *bp, gn);
-		}
+			// Process achieving operators again to find disj. LMs
+			vector<set<pair<int, int> > > disjunctive_pre;
+			compute_disjunctive_preconditions(disjunctive_pre, lvl_var, bp);
+			for(int i = 0; i < disjunctive_pre.size(); i++)
+			if(disjunctive_pre[i].size() < 5) { // We don't want disj. LMs to get too big
+				found_disj_lm_and_order(disjunctive_pre[i], *bp, gn);
+			}
         }
     }
     add_lm_forward_orders();

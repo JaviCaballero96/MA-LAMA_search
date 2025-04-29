@@ -185,7 +185,13 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 						op_duration = new_predecessor.calculate_runtime_efect<float>(pp.runtime_cost_effect);
 						if(op_duration == 0)
 							op_duration = 0.01;
-					} else{
+					}else if (pp.have_module_cost_effect) {
+						cout << pp.runtime_cost_effect << endl;
+						op_duration = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pp.runtime_cost_effect]);
+						if(op_duration == 0)
+							op_duration = 0.01;
+
+					}else{
 						op_duration = pp.f_cost;
 						if(op_duration == 0)
 							op_duration = 0.01;
@@ -323,6 +329,49 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 					}
 				}
 			}
+			for(int i = 0; i < new_op.get_prevail().size(); i++) {
+				Prevail prevail = new_op.get_prevail()[i];
+				for(int j = 0; j < g_timed_goals.size(); j++) {
+				    // pair<int, int> t_goal = g_timed_goals[j].first;
+
+					float min_start_action_time = -1.0;
+					bool value_changed = false;
+					for(int k = 0; k < g_timed_goals[j].second.size(); k++) {
+						pair<pair<int, int>, float> t_fact = g_timed_goals[j].second[k];
+
+						//For each timed fact in timed goals, check if the fact is needed by the action
+						// and get the most restrictive time
+						if((t_fact.first.second != -1) && (prevail.prev > -1)) {
+							if((t_fact.first.first == prevail.var) && (t_fact.first.second == prevail.prev)) {
+								/* cout << "The action " << new_op.get_name() << " needs the timed fact " <<
+							    	t_fact.first.first << "," << t_fact.first.second << "-" << t_fact.second <<
+										" from the timed goal " << t_goal.first << "," << t_goal.second << endl;
+								cout << "The current time is " << new_predecessor.get_g_current_time_value() << endl; */
+								if(new_predecessor.get_g_current_time_value() < t_fact.second) {
+									if(min_start_action_time < t_fact.second)
+									{
+										min_start_action_time = t_fact.second;
+										value_changed = true;
+									}
+								}
+							}
+						}
+					}
+					if(value_changed) {
+						if(new_op.get_name().find("_start") != string::npos)
+						{
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_start_time;
+						} else {
+							op_start_time = min_start_action_time;
+							op_end_time = min_start_action_time + op_duration;
+							g_current_time_value = op_end_time;
+						}
+
+					}
+				}
+			}
 		}
 
 		// If the action added is an start action, we must remove the previous one
@@ -348,7 +397,10 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 						new_op.get_pre_post()[i].f_cost,
 						new_op.get_pre_post()[i].cond);
 				pre_post->have_runtime_cost_effect = new_op.get_pre_post()[i].have_runtime_cost_effect;
+				pre_post->have_module_cost_effect = new_op.get_pre_post()[i].have_module_cost_effect;
 				if(pre_post->have_runtime_cost_effect)
+					pre_post->runtime_cost_effect = new_op.get_pre_post()[i].runtime_cost_effect;
+				else if(pre_post->have_module_cost_effect)
 					pre_post->runtime_cost_effect = new_op.get_pre_post()[i].runtime_cost_effect;
 				else
 					pre_post->runtime_cost_effect = "";
@@ -359,7 +411,11 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 					{
 						pre_post->f_cost = new_predecessor.calculate_runtime_efect<float>(pre_post->runtime_cost_effect);
 						running_actions.back().functional_costs.push_back(pre_post);
-					} else
+					} else if(pre_post->have_module_cost_effect) {
+						pre_post->f_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post->runtime_cost_effect]);
+						running_actions.back().functional_costs.push_back(pre_post);
+					}
+					else
 						running_actions.back().functional_costs.push_back(pre_post);
 				}
 			}
@@ -483,9 +539,13 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 				else {
 					vars[pre_post.var] = pre_post.post;
 					float cal_cost = 0;
-					if (!pre_post.have_runtime_cost_effect){
+					if (!pre_post.have_runtime_cost_effect && !pre_post.have_module_cost_effect){
 						numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + pre_post.f_cost;
 						cal_cost = pre_post.f_cost;
+					} else if (pre_post.have_module_cost_effect) {
+						// cout << pre_post.runtime_cost_effect << endl;
+						cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
+						numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] + cal_cost;
 					}
 					else{
 						cal_cost = new_predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
@@ -497,8 +557,13 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 			}
 			case -3:
 				vars[pre_post.var] = pre_post.post;
-				if (!pre_post.have_runtime_cost_effect)
+				if (!pre_post.have_runtime_cost_effect && !pre_post.have_module_cost_effect) {
 					numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] - pre_post.f_cost;
+				}
+				else if (pre_post.have_module_cost_effect) {
+					float cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
+					numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] - cal_cost;
+				}
 				else{
 					float cal_cost = new_predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
 					numeric_vars_val[pre_post.var] = new_predecessor.numeric_vars_val[pre_post.var] - cal_cost;
@@ -507,8 +572,13 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 
 			case -4:
 				vars[pre_post.var] = pre_post.post;
-				if (!pre_post.have_runtime_cost_effect)
+				if (!pre_post.have_runtime_cost_effect && !pre_post.have_module_cost_effect)
 					numeric_vars_val[pre_post.var] = pre_post.f_cost;
+				else if (pre_post.have_module_cost_effect) {
+					// cout << pre_post.runtime_cost_effect << endl;
+					float cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
+					numeric_vars_val[pre_post.var] = cal_cost;
+				}
 				else{
 					float cal_cost = new_predecessor.calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
 					numeric_vars_val[pre_post.var] = cal_cost;
@@ -531,8 +601,12 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
     else if (g_use_metric_total_time)
     	g_value = this->get_g_current_time_value() + 1;
     else
-    	if (!new_op.get_have_runtime_cost())
+    	if (!new_op.get_have_runtime_cost() && !new_op.get_have_module_cost())
         	g_value = new_predecessor.get_g_value() + new_op.get_cost();
+		else if (new_op.get_have_module_cost()) {
+			// cout << new_op.get_runtime_cost() << endl;
+			g_value =  new_predecessor.get_g_value() + g_ext_func_manager.compute_function(g_instantiated_funcs_dict[new_op.get_runtime_cost()]);
+		}
     	else {
     		g_value = new_predecessor.get_g_value() + this->calculate_runtime_efect<float>(new_op.get_runtime_cost()) + 1;
     	}
@@ -593,7 +667,13 @@ State::State(const State &predecessor, const Operator &op)
 				{
 					if(pp.have_runtime_cost_effect)
 					{
+						// cout << pp.runtime_cost_effect << endl;
 						op_duration = predecessor.calculate_runtime_efect<float>(pp.runtime_cost_effect);
+						if(op_duration == 0)
+							op_duration = 0.01;
+					} else if(pp.have_module_cost_effect) {
+						// cout << pp.runtime_cost_effect << endl;
+						op_duration = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pp.runtime_cost_effect]);
 						if(op_duration == 0)
 							op_duration = 0.01;
 					} else {
@@ -735,6 +815,49 @@ State::State(const State &predecessor, const Operator &op)
 					}
 				}
 			}
+			for(int i = 0; i < op.get_prevail().size(); i++) {
+							Prevail pevail = op.get_prevail()[i];
+							for(int j = 0; j < g_timed_goals.size(); j++) {
+							    // pair<int, int> t_goal = g_timed_goals[j].first;
+
+								float min_start_action_time = -1.0;
+								bool value_changed = false;
+								for(int k = 0; k < g_timed_goals[j].second.size(); k++) {
+									pair<pair<int, int>, float> t_fact = g_timed_goals[j].second[k];
+
+									//For each timed fact in timed goals, check if the fact is needed by the action
+									// and get the most restrictive time
+									if((t_fact.first.second != -1) && (pevail.prev > -1)) {
+										if((t_fact.first.first == pevail.var) && (t_fact.first.second == pevail.prev)) {
+											/* cout << "The action " << op.get_name() << " needs the timed fact " <<
+										    	t_fact.first.first << "," << t_fact.first.second << "-" << t_fact.second <<
+													" from the timed goal " << t_goal.first << "," << t_goal.second << endl;
+											cout << "The current time is " << predecessor.get_g_current_time_value() << endl; */
+											if(predecessor.get_g_current_time_value() < t_fact.second) {
+												if(min_start_action_time < t_fact.second)
+												{
+													min_start_action_time = t_fact.second;
+													value_changed = true;
+												}
+											}
+										}
+									}
+								}
+								if(value_changed) {
+									if(op.get_name().find("_start") != string::npos)
+									{
+										op_start_time = min_start_action_time;
+										op_end_time = min_start_action_time + op_duration;
+										g_current_time_value = op_start_time;
+									} else {
+										op_start_time = min_start_action_time;
+										op_end_time = min_start_action_time + op_duration;
+										g_current_time_value = op_end_time;
+									}
+
+								}
+							}
+						}
 		}
 
 		vector<runn_action>::const_iterator it_ra_const = predecessor.running_actions.begin();
@@ -758,7 +881,10 @@ State::State(const State &predecessor, const Operator &op)
 						op.get_pre_post()[i].cond);
 
 				pre_post->have_runtime_cost_effect = op.get_pre_post()[i].have_runtime_cost_effect;
+				pre_post->have_module_cost_effect = op.get_pre_post()[i].have_module_cost_effect;
 				if(pre_post->have_runtime_cost_effect)
+					pre_post->runtime_cost_effect = op.get_pre_post()[i].runtime_cost_effect;
+				else if(pre_post->have_module_cost_effect)
 					pre_post->runtime_cost_effect = op.get_pre_post()[i].runtime_cost_effect;
 				else
 					pre_post->runtime_cost_effect = "";
@@ -769,8 +895,14 @@ State::State(const State &predecessor, const Operator &op)
 					{
 						pre_post->f_cost = predecessor.calculate_runtime_efect<float>(pre_post->runtime_cost_effect);
 						running_actions.back().functional_costs.push_back(pre_post);
-					} else
+					} else if(pre_post->have_module_cost_effect)
+					{
+						// cout << pre_post->runtime_cost_effect << endl;
+						pre_post->f_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post->runtime_cost_effect]);
 						running_actions.back().functional_costs.push_back(pre_post);
+					}else {
+						running_actions.back().functional_costs.push_back(pre_post);
+					}
 				}
 			}
 		} else {
@@ -939,9 +1071,13 @@ State::State(const State &predecessor, const Operator &op)
 				else {
 					vars[pre_post.var] = pre_post.post;
 					float cal_cost = 0;
-					if (!pre_post.have_runtime_cost_effect){
+					if (!pre_post.have_runtime_cost_effect && !pre_post.have_module_cost_effect){
 						numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + pre_post.f_cost;
 						cal_cost = pre_post.f_cost;
+					} else if(pre_post.have_module_cost_effect) {
+						// cout << pre_post.runtime_cost_effect << endl;
+						cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
+						numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] + cal_cost;
 					}
 					else{
 						cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
@@ -953,8 +1089,14 @@ State::State(const State &predecessor, const Operator &op)
 			}
 			case -3:
 				vars[pre_post.var] = pre_post.post;
-				if (!pre_post.have_runtime_cost_effect)
+				if (!pre_post.have_runtime_cost_effect && !pre_post.have_module_cost_effect) {
 					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] - pre_post.f_cost;
+				}
+				else if(pre_post.have_module_cost_effect) {
+					// cout << pre_post.runtime_cost_effect << endl;
+					float cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
+					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] - cal_cost;
+				}
 				else{
 					float cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
 					numeric_vars_val[pre_post.var] = numeric_vars_val[pre_post.var] - cal_cost;
@@ -963,8 +1105,13 @@ State::State(const State &predecessor, const Operator &op)
 
 			case -4:
 				vars[pre_post.var] = pre_post.post;
-				if (!pre_post.have_runtime_cost_effect)
+				if (!pre_post.have_runtime_cost_effect && !pre_post.have_module_cost_effect)
 					numeric_vars_val[pre_post.var] = pre_post.f_cost;
+				else if(pre_post.have_module_cost_effect) {
+					// cout << pre_post.runtime_cost_effect << endl;
+					float cal_cost = g_ext_func_manager.compute_function(g_instantiated_funcs_dict[pre_post.runtime_cost_effect]);
+					numeric_vars_val[pre_post.var] = cal_cost;
+				}
 				else{
 					float cal_cost = this->calculate_runtime_efect<float>(pre_post.runtime_cost_effect);
 					numeric_vars_val[pre_post.var] = cal_cost;
@@ -989,8 +1136,12 @@ State::State(const State &predecessor, const Operator &op)
     else if (g_use_metric_total_time)
     	g_value = this->get_g_current_time_value() + 1;
     else {
-    	if (!op.get_have_runtime_cost())
+    	if (!op.get_have_runtime_cost() && !op.get_have_module_cost())
         	g_value = predecessor.get_g_value() + op.get_cost();
+    	else if (op.get_have_module_cost()){
+    		// cout <<op.get_runtime_cost() << endl;
+    		g_value =  predecessor.get_g_value() + g_ext_func_manager.compute_function(g_instantiated_funcs_dict[op.get_runtime_cost()]);
+    	}
     	else {
     		g_value = predecessor.get_g_value() + this->calculate_runtime_efect<float>(op.get_runtime_cost()) + 1;
     	}
@@ -1195,6 +1346,8 @@ T State::calculate_runtime_efect(string s_effect) const {
 	        start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
 	    }
 	}
+
+	// cout << s_effect << endl;
 
     // now solve the operation
 	typedef exprtk::symbol_table<T> symbol_table_t;

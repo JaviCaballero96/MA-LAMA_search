@@ -28,6 +28,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include "external_function.h"
 using namespace std;
 
 class AxiomEvaluator;
@@ -43,6 +45,7 @@ class LandmarksCountHeuristic;
 class LandmarksGraph;
 
 void read_everything(istream &in, bool generate_landmarks, bool reasonable_orders, bool read_init_state, bool read_runtime_constraints);
+void load_external_modules();
 void read_runtime_contraints();
 void process_shared_vars_values();
 void read_ext_init_state();
@@ -84,6 +87,9 @@ extern vector<pair<string, float> > external_init_state_numeric_vars;
 extern State *g_initial_state;
 extern vector<pair<int, int> > g_goal;
 extern vector<pair<pair<int, int>, vector<pair<pair<int, int>, double > > > > g_timed_goals;
+extern vector<ExternalFunctionModuleInfo> g_modules;
+extern std::unordered_map<string, int> g_instantiated_funcs_dict;
+extern ExternalFunctionManager g_ext_func_manager;
 extern vector<pair<string, int> > g_shared_vars;
 extern vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
 extern vector<Operator> g_operators;

@@ -139,6 +139,7 @@ int main(int argc, const char **argv) {
 	generate_landmarks = true;
     times(&landmarks_generation_start);
     read_everything(fs, generate_landmarks, reasonable_orders, read_init_state, read_runtime_constraints);
+    load_external_modules();
 
     if (use_hard_temporal_constraints && (g_timed_goals.size() != 0)) {
     	cout << "Hard temporal constraints and timed goals are currently not supported at the same time." << endl;
@@ -415,7 +416,10 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 
 
     }
-    outfile << "Total-time Cost: " <<  plan_cost << endl;
+    if(g_use_metric_total_time)
+    	outfile << "Total-time Cost: " <<  plan_cost << endl;
+    else
+    	outfile << "Cost: " <<  plan_cost << endl;
     outfile << "Expanded nodes: " << engine->statistics() << endl;
     outfile << "Search time: " << search_time << endl;
     outfile.close();
