@@ -38,27 +38,48 @@ Prevail::Prevail(istream &in) {
 PrePost::PrePost(istream &in) {
 	/* effects */
     int condCount;
+    string modaux("modulefunc--");
     string s_aux = "";
     in >> condCount;
     for(int i = 0; i < condCount; i++)
         cond.push_back(Prevail(in));
     in >> var >> pre >> post;
+    have_module_cost_effect = false;
+    have_runtime_cost_effect = false;
     if ((pre == -2) || (pre == -3) || (pre == -4)  || (pre == -5)  || (pre == -6))
     {
     	in >> s_aux;
-    	if (s_aux.find('(') == std::string::npos)
+    	if (s_aux.find(modaux) != std::string::npos)
+    	{
+    		f_cost = 0;
+    		have_module_cost_effect = true;
+    		string func_name(s_aux.substr(modaux.size(), s_aux.length()));
+    		runtime_cost_effect = func_name;
+
+    		if(g_instantiated_funcs_dict.find(func_name) != g_instantiated_funcs_dict.end())
+    		{
+    			// Var is not updated
+    			cout << "Already computed! -> " << func_name << " -- " << g_instantiated_funcs_dict[func_name] << endl;
+
+    		} else {
+    			cout << func_name << " -- " << g_instantiated_funcs_dict.size() + 1 << endl;
+    			g_instantiated_funcs_dict[func_name] = g_instantiated_funcs_dict.size() + 1;
+    		}
+
+    	}else if (s_aux.find('(') == std::string::npos)
     	{
             istringstream buffer(s_aux);
             buffer >> f_cost;
             have_runtime_cost_effect = false;
             runtime_cost_effect = "";
-    	}else
+    	} else
     	{
     		f_cost = 0;
     		have_runtime_cost_effect = true;
     		runtime_cost_effect = s_aux;
     	}
     }
+    is_conditional_effect = false;
 
 }
 
@@ -95,12 +116,28 @@ Operator::Operator(istream &in, bool axiom) {
 	{
 		have_runtime_cost = true;
 		in >> runtime_cost;
+
+	} else if(s_aux == "modulefunc") {
+		//cout << name << endl;
+		have_module_cost = true;
+		in >> runtime_cost;
+
+		if(g_instantiated_funcs_dict.find(runtime_cost) != g_instantiated_funcs_dict.end())
+		{
+			// Var is not updated
+			cout << "Cost Already computed! -> " << runtime_cost << " -- " << g_instantiated_funcs_dict[runtime_cost] << endl;
+
+		} else {
+			cout << runtime_cost << " -- " << (g_instantiated_funcs_dict.size() + 1) << endl;
+			g_instantiated_funcs_dict[runtime_cost] = (g_instantiated_funcs_dict.size() + 1);
+		}
 	}else
 	{
 		have_runtime_cost = false;
 		runtime_cost = "";
 		in >> s_aux;
 	}
+	// cout << name << endl;
 
 
     check_magic(in, "end_operator");
