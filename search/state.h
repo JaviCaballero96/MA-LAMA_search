@@ -27,6 +27,7 @@
 
 #include <iostream>
 #include <vector>
+#include <map>
 #include <ext/hash_set>
 #include "landmarks_types.h"
 #include <string>
@@ -76,6 +77,14 @@ public:
     vector<float> numeric_vars_val;
     vector<string> applied_actions_vec;
     vector<pair<int, int> > timed_goals_obtained;
+    // var -> time this agent's own actions last transitioned that shared
+    // variable (acquire or release). Lets check_external_locks_validity()
+    // detect an external agent touching the SAME variable while we still
+    // hold an earlier, unresolved claim to it -- a case a plain "does the
+    // required value match" comparison cannot see, since both sides can
+    // show the same encoded "not free" value for entirely different
+    // reasons (see successor_generator.cc).
+    map<int, float> shared_var_last_touch;
     State(istream &in);
     // State(const State &origin);
     State(const State &predecessor, const Operator &op);

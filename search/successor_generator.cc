@@ -199,6 +199,7 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 				if((*it_ra).non_temporal_action_name == op->get_non_temporal_action_name())
 				{
 					op_end_time = (*it_ra).time_end;
+					op_duration = (*it_ra).time_end - (*it_ra).time_start;
 				}else{
 					it_ra++;
 				}
@@ -333,10 +334,85 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 							break;
 						}
 					}
+
+					// A release (pure effect, pp.pre == -1, e.g. "(at end
+					// (free ?from))") has no precondition value to compare
+					// above, and op_end_time here already equals "now" (the
+					// completion instant) -- comparing this one flight's
+					// own duration against "the next boundary from now"
+					// can never see a conflict that happened earlier in a
+					// hold built from several hops (acquire, then a chain
+					// of depart-and-immediately-reacquire, then finally
+					// this release). Scan the WHOLE unbroken hold instead,
+					// anchored at when it actually started (tracked in
+					// curr.shared_var_last_touch), for any external
+					// transition that landed inside it.
+					if(op_valid && (pp.pre == -1))
+					{
+						map<int, float>::const_iterator it_anchor = curr.shared_var_last_touch.find(pp.var);
+						if(it_anchor != curr.shared_var_last_touch.end())
+						{
+							float held_since = it_anchor->second;
+							for(int j = 0; j < g_shared_vars_timed_values[k]->second->size(); j++)
+							{
+								float transition_time = (*(g_shared_vars_timed_values[k]->second))[j]->second;
+								if((transition_time > held_since) && (transition_time <= op_end_time))
+								{
+									op_valid = false;
+									break;
+								}
+							}
+						}
+					}
 				}
 			}
 		}
 
+		// The check above only fires when THIS candidate operator's own
+		// pre/post touches a shared variable. But time keeps advancing to
+		// op_end_time regardless of what this operator does. If we are
+		// still sitting on an earlier, unresolved claim to some OTHER
+		// shared variable (recorded in curr.shared_var_last_touch when we
+		// acquired/released it) and an external agent's timeline shows ANY
+		// transition of that same variable since then, that is a genuine
+		// conflict -- even though comparing raw encoded values (as the
+		// check above does) cannot see it, since both sides can show the
+		// same "not free" value for entirely different reasons (we hold it
+		// for our own reason; they now also claim it for theirs).
+		for(map<int, float>::const_iterator it_lt = curr.shared_var_last_touch.begin();
+				it_lt != curr.shared_var_last_touch.end() && op_valid; ++it_lt)
+		{
+			int var = it_lt->first;
+			float last_touch = it_lt->second;
+
+			bool touched_by_this_op = false;
+			for(vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
+					it_pp != op->get_pre_post().end(); ++it_pp)
+			{
+				if(it_pp->var == var) {
+					touched_by_this_op = true;
+					break;
+				}
+			}
+			if(touched_by_this_op)
+				continue;  // handled by the check above instead
+
+			for(int k = 0; k < g_shared_vars_timed_values.size(); k++)
+			{
+				if(g_shared_vars_timed_values[k]->first != var)
+					continue;
+				for(int j = 0; j < g_shared_vars_timed_values[k]->second->size(); j++)
+				{
+					float transition_time = (*(g_shared_vars_timed_values[k]->second))[j]->second;
+					if((transition_time > last_touch) && (transition_time <= op_end_time))
+					{
+						op_valid = false;
+						break;
+					}
+				}
+				break;
+			}
+		}
 
 		if (!op_valid){
 			it = ops.erase(it);

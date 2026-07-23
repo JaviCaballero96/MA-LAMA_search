@@ -769,6 +769,37 @@ State::State(const State &predecessor, const Operator &op)
 			}
 		}
 
+		// Forward + update per-shared-var "last touched by me" bookkeeping
+		// (see the member declaration in state.h for the rationale). This
+		// must run for both soft and hard temporal-constraint modes, since
+		// it tracks our own actions, not the constraint-driven wait itself,
+		// so it sits outside the use_hard_temporal_constraints block above.
+		//
+		// A genuine acquire (an explicit precondition, pp.pre != -1 --
+		// e.g. "(at start (free ?to))") (re)anchors the start of an
+		// unbroken hold. A pure-effect release (pp.pre == -1 -- e.g.
+		// "(at end (free ?from))", which has no precondition of its own)
+		// closes it. Anchoring on EVERY touch (acquire or release alike)
+		// would reset to "now" on each hop of a shuttle like
+		// acquire -> depart-and-immediately-reacquire -> depart -> ...,
+		// hiding an external claim that lands squarely inside the
+		// continuous hold those hops add up to even though no single hop's
+		// own span crosses it.
+		shared_var_last_touch = predecessor.shared_var_last_touch;
+		for(int k = 0; k < g_shared_vars_timed_values.size(); k++) {
+			int svar = g_shared_vars_timed_values[k]->first;
+			vector<PrePost>::const_iterator it_pp = op.get_pre_post().begin();
+			for(; it_pp != op.get_pre_post().end(); ++it_pp) {
+				if(it_pp->var == svar) {
+					if(it_pp->pre != -1)
+						shared_var_last_touch[svar] = op_end_time;
+					else
+						shared_var_last_touch.erase(svar);
+					break;
+				}
+			}
+		}
+
 		// We need to check if any of the preconditions needed by the action is
 		// associated to a timed goal
 		if(g_timed_goals.size() != 0) {
@@ -1206,8 +1237,18 @@ void State::dump() const {
 }
 
 bool State::operator<(const State &other) const {
-    return lexicographical_compare(vars.begin(), vars.end(),
-				   other.vars.begin(), other.vars.end());
+    if(vars != other.vars)
+	return lexicographical_compare(vars.begin(), vars.end(),
+				       other.vars.begin(), other.vars.end());
+    // Two states can have identical discrete variables yet be genuinely
+    // different: under use_hard_temporal_constraints, a blocked operator's
+    // successor state advances only g_current_time_value (it "waits" for an
+    // externally-locked shared variable to free up) without touching vars.
+    // The closed list is a std::map<State, ...> keyed on this operator<, so
+    // without this tie-break a waited state compares equal to its own
+    // parent (already in the closed list) and is discarded as a duplicate
+    // before it can ever be expanded -- silently defeating the wait.
+    return g_current_time_value < other.g_current_time_value;
 }
 
 void State::set_landmarks_for_initial_state() {
