@@ -39,6 +39,12 @@
 #include <algorithm>
 using namespace std;
 
+// See the matching definition in successor_generator.cc for the rationale:
+// independently-computed clocks for the same real instant can differ by a
+// small amount without being wrong, so timeline boundary lookups tolerate
+// this much drift.
+const float SHARED_VAR_TIME_TOLERANCE = 0.02f;
+
 State::State(istream &in) {
     check_magic(in, "begin_state");
     for(int i = 0; i < g_variable_domain.size(); i++) {
@@ -140,8 +146,8 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 						// Search constraint value at that time
 						for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
 						{
-							if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
-									(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+							if(((op_end_time + SHARED_VAR_TIME_TOLERANCE) >= (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+									((op_end_time + SHARED_VAR_TIME_TOLERANCE) < (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
 							{
 								if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
 										(pp.pre != -1) &&
@@ -221,22 +227,26 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 		if(new_op.get_name().find("_end") != string::npos)
 		{
 			vector<runn_action>::const_iterator it_ra = new_predecessor.running_actions.begin();
-			for(; it_ra != new_predecessor.running_actions.end();)
+			for(; it_ra != new_predecessor.running_actions.end(); it_ra++)
 			{
 				if((*it_ra).non_temporal_action_name == new_op.get_non_temporal_action_name())
 				{
 					op_end_time = (*it_ra).time_end;
-				}else{
-					it_ra++;
+					break;
 				}
-
-				break;
 			}
 		}
 
 		g_current_time_value = op_end_time;
 		if(use_hard_temporal_constraints)
 		{
+			// A "_start" operator's true time is the predecessor's
+			// current time, not op_end_time's padded default. Use the
+			// real time here so the lock check is not fooled.
+			float lock_check_time = op_end_time;
+			if(new_op.get_name().find("_start") != string::npos)
+				lock_check_time = new_predecessor.get_g_current_time_value();
+
 			// Check if the time has to be updated because of external constraints
 			for(int k = 0; k < g_shared_vars_timed_values.size(); k++)
 			{
@@ -249,8 +259,8 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 						// Search constraint value at that time
 						for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
 						{
-							if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
-									(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+							if(((lock_check_time + SHARED_VAR_TIME_TOLERANCE) >= (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+									((lock_check_time + SHARED_VAR_TIME_TOLERANCE) < (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
 							{
 								if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
 										(pp.pre != -1) &&
@@ -527,8 +537,9 @@ void State::change_ancestor(const State &new_predecessor, const Operator &new_op
 	{
 		this->numeric_vars_val.push_back(*it_f);
 	}
-    // Only truly update numeric values if the action is an end action
-    for(int i = 0; (i < new_op.get_pre_post().size()) && ((new_op.get_name().find("_end") != string::npos) || (is_temporal)) ; i++) {
+    // Numeric values should only update when the action ends. For
+    // non-temporal domains there is no start/end split, so always apply.
+    for(int i = 0; (i < new_op.get_pre_post().size()) && ((!is_temporal) || (new_op.get_name().find("_end") != string::npos)) ; i++) {
 		const PrePost &pre_post = new_op.get_pre_post()[i];
 		if(pre_post.does_fire(new_predecessor)){
 			switch(pre_post.pre){
@@ -707,16 +718,13 @@ State::State(const State &predecessor, const Operator &op)
 		if(op.get_name().find("_end") != string::npos)
 		{
 			vector<runn_action>::const_iterator it_ra = predecessor.running_actions.begin();
-			for(; it_ra != predecessor.running_actions.end();)
+			for(; it_ra != predecessor.running_actions.end(); it_ra++)
 			{
 				if((*it_ra).non_temporal_action_name == op.get_non_temporal_action_name())
 				{
 					op_end_time = (*it_ra).time_end;
-				}else{
-					it_ra++;
+					break;
 				}
-
-				break;
 			}
 		}
 
@@ -724,6 +732,13 @@ State::State(const State &predecessor, const Operator &op)
 		// Check if the time has to be updated because of external constraints
 		if(use_hard_temporal_constraints)
 		{
+			// A "_start" operator's true time is the predecessor's
+			// current time, not op_end_time's padded default. Use the
+			// real time here so the lock check is not fooled.
+			float lock_check_time = op_end_time;
+			if(op.get_name().find("_start") != string::npos)
+				lock_check_time = predecessor.get_g_current_time_value();
+
 			for(int k = 0; k < g_shared_vars_timed_values.size(); k++)
 			{
 				vector<PrePost>::const_iterator it_pp = op.get_pre_post().begin();
@@ -735,8 +750,8 @@ State::State(const State &predecessor, const Operator &op)
 						// Search constraint value at that time
 						for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
 						{
-							if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
-									(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+							if(((lock_check_time + SHARED_VAR_TIME_TOLERANCE) >= (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+									((lock_check_time + SHARED_VAR_TIME_TOLERANCE) < (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
 							{
 								if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
 										(pp.pre != -1) &&
@@ -769,22 +784,10 @@ State::State(const State &predecessor, const Operator &op)
 			}
 		}
 
-		// Forward + update per-shared-var "last touched by me" bookkeeping
-		// (see the member declaration in state.h for the rationale). This
-		// must run for both soft and hard temporal-constraint modes, since
-		// it tracks our own actions, not the constraint-driven wait itself,
-		// so it sits outside the use_hard_temporal_constraints block above.
-		//
-		// A genuine acquire (an explicit precondition, pp.pre != -1 --
-		// e.g. "(at start (free ?to))") (re)anchors the start of an
-		// unbroken hold. A pure-effect release (pp.pre == -1 -- e.g.
-		// "(at end (free ?from))", which has no precondition of its own)
-		// closes it. Anchoring on EVERY touch (acquire or release alike)
-		// would reset to "now" on each hop of a shuttle like
-		// acquire -> depart-and-immediately-reacquire -> depart -> ...,
-		// hiding an external claim that lands squarely inside the
-		// continuous hold those hops add up to even though no single hop's
-		// own span crosses it.
+		// Update per-shared-var bookkeeping of when this agent last
+		// changed it. Runs in both soft and hard temporal-constraint
+		// modes. A real precondition marks an acquire and resets the
+		// time; a pure effect marks a release and clears it.
 		shared_var_last_touch = predecessor.shared_var_last_touch;
 		for(int k = 0; k < g_shared_vars_timed_values.size(); k++) {
 			int svar = g_shared_vars_timed_values[k]->first;
@@ -1052,8 +1055,8 @@ State::State(const State &predecessor, const Operator &op)
 						// Search constraint value at that time
 						for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
 						{
-							if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
-									(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+							if(((op_end_time + SHARED_VAR_TIME_TOLERANCE) >= (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+									((op_end_time + SHARED_VAR_TIME_TOLERANCE) < (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
 							{
 								if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
 										(pp.pre != -1) &&
@@ -1090,8 +1093,9 @@ State::State(const State &predecessor, const Operator &op)
 			vars[pre_post.var] = pre_post.post;
     }
 
-    // Only truly update numeric values if the action is an end action
-    for(int i = 0; (i < op.get_pre_post().size()) && ((op.get_name().find("_end") != string::npos) || (is_temporal)) ; i++) {
+    // Numeric values should only update when the action ends. For
+    // non-temporal domains there is no start/end split, so always apply.
+    for(int i = 0; (i < op.get_pre_post().size()) && ((!is_temporal) || (op.get_name().find("_end") != string::npos)) ; i++) {
 		const PrePost &pre_post = op.get_pre_post()[i];
 		if(pre_post.does_fire(predecessor)){
 			switch(pre_post.pre){
@@ -1197,36 +1201,29 @@ State::State(const State &predecessor, const Operator &op)
     	g_value = g_value - 1;
 }
 
-float get_new_time_window(Operator op, State* curr, float op_duration, vector<pair<int, float>* > ex_const_vector, int value) {
+float get_new_time_window(Operator op, const State* curr, float op_duration, vector<pair<int, float>* > ex_const_vector, int value) {
 
-	float new_init_time = 0;
 	float current_time = curr->get_g_current_time_value();
 
-	bool new_window_found = false;
-	for(int i = 0; i < (ex_const_vector.size() - 1); i++)
+	// Find the earliest recorded transition at or after current_time whose
+	// value matches what this operator needs, with a wide enough window
+	// before the next transition to fit the operator's own duration. If
+	// nothing matches, do not advance the clock.
+	for(int i = 0; i < ex_const_vector.size(); i++)
 	{
-		if((current_time > ex_const_vector[i]->second) &&
-				(current_time < ex_const_vector[i + 1]->second) &&
+		if((ex_const_vector[i]->second >= current_time) &&
 				(value == ex_const_vector[i]->first))
 		{
-			float time_window_size =
-					(ex_const_vector[i + 1]->second) -
-					(ex_const_vector[i]->second);
-			if(op_duration < time_window_size)
-			{
-				new_window_found = true;
-				new_init_time = ex_const_vector[i]->second;
-			}
+			bool has_next = (i + 1) < ex_const_vector.size();
+			float window_size = has_next ?
+					(ex_const_vector[i + 1]->second - ex_const_vector[i]->second) :
+					op_duration;
+			if(op_duration <= window_size)
+				return ex_const_vector[i]->second;
 		}
 	}
 
-	if((!new_window_found) && (ex_const_vector[ex_const_vector.size() - 1]->first == value))
-	{
-			new_window_found = true;
-			new_init_time = ex_const_vector[ex_const_vector.size() - 1]->second;
-	}
-
-	return new_init_time;
+	return current_time;
 }
 
 
@@ -1236,19 +1233,37 @@ void State::dump() const {
 	cout << "  " << g_variable_name[i] << ": " << vars[i] << endl;
 }
 
+// Counts how many recorded transitions in a shared variable's timeline
+// have happened by time t. Two times with the same count are equivalent
+// for validity purposes.
+static int time_bucket(float t, const vector<pair<int, float>*> &timeline) {
+    int count = 0;
+    for(int i = 0; i < timeline.size(); i++) {
+	if(timeline[i]->second <= t)
+	    count++;
+	else
+	    break;  // timeline is in chronological order
+    }
+    return count;
+}
+
 bool State::operator<(const State &other) const {
     if(vars != other.vars)
 	return lexicographical_compare(vars.begin(), vars.end(),
 				       other.vars.begin(), other.vars.end());
-    // Two states can have identical discrete variables yet be genuinely
-    // different: under use_hard_temporal_constraints, a blocked operator's
-    // successor state advances only g_current_time_value (it "waits" for an
-    // externally-locked shared variable to free up) without touching vars.
-    // The closed list is a std::map<State, ...> keyed on this operator<, so
-    // without this tie-break a waited state compares equal to its own
-    // parent (already in the closed list) and is discarded as a duplicate
-    // before it can ever be expanded -- silently defeating the wait.
-    return g_current_time_value < other.g_current_time_value;
+    // States with identical discrete variables are treated as equal
+    // unless a shared variable's timeline has a transition between
+    // their times. This keeps the usual deduplication while still
+    // telling apart states whose validity differs because of an
+    // external timeline or a temporal-constraints wait.
+    for(int k = 0; k < g_shared_vars_timed_values.size(); k++) {
+	const vector<pair<int, float>*> &timeline = *(g_shared_vars_timed_values[k]->second);
+	int bucket_this = time_bucket(g_current_time_value, timeline);
+	int bucket_other = time_bucket(other.g_current_time_value, timeline);
+	if(bucket_this != bucket_other)
+	    return bucket_this < bucket_other;
+    }
+    return false;
 }
 
 void State::set_landmarks_for_initial_state() {

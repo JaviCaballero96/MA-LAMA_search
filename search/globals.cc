@@ -457,18 +457,37 @@ void process_shared_vars_values()
 		first_value->second = float(0.00);
 		var_timed_values->push_back(first_value);
 
-		int min_index = -1;
-		float curr_time_value = 0;
-		bool min_found = false;
+		// Walk this var's constraint entries in chronological order.
+		// When two entries share the same time (a release and an
+		// immediate re-acquire), process the release first, matching
+		// the release-before-acquire convention used elsewhere.
+		vector<bool> consumed(external_blocked_vars.size(), false);
 		int last_added_val = -2;
-		do{
+		bool min_found = true;
+		while(min_found)
+		{
 			min_found = false;
-			float min_time = 999999;
+			int min_index = -1;
+			float min_time = 0;
 			for(int j = 0; j < external_blocked_vars.size(); j++)
 			{
+				if(consumed[j]) continue;
 				if((external_blocked_vars[j]->in_current_agent) && (external_blocked_vars[j]->var == g_shared_vars[i].second))
 				{
-					if((min_index == -1) || ((curr_time_value < external_blocked_vars[j]->time_set) && (min_time > external_blocked_vars[j]->time_set))){
+					bool better;
+					if(min_index == -1) {
+						better = true;
+					} else if(external_blocked_vars[j]->time_set < min_time) {
+						better = true;
+					} else if((external_blocked_vars[j]->time_set == min_time) &&
+							(external_blocked_vars[j]->val_pre == -1) &&
+							(external_blocked_vars[min_index]->val_pre != -1)) {
+						better = true;
+					} else {
+						better = false;
+					}
+
+					if(better){
 						min_index = j;
 						min_found = true;
 						min_time = external_blocked_vars[j]->time_set;
@@ -476,8 +495,9 @@ void process_shared_vars_values()
 				}
 			}
 
-			if((min_index != -1) && min_found)
+			if(min_found)
 			{
+				consumed[min_index] = true;
 				if(last_added_val != external_blocked_vars[min_index]->val_pos)
 				{
 					last_added_val = external_blocked_vars[min_index]->val_pos;
@@ -486,13 +506,9 @@ void process_shared_vars_values()
 					timed_value->second = external_blocked_vars[min_index]->time_set;
 
 					var_timed_values->push_back(timed_value);
-					curr_time_value = external_blocked_vars[min_index]->time_set;
-				}else{
-					curr_time_value = external_blocked_vars[min_index]->time_set;
 				}
 			}
-
-		} while(min_found);
+		}
 
 
 		shared_var_pair_list->second = var_timed_values;

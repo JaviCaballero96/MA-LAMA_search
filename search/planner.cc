@@ -350,7 +350,10 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 						}*/
 						constraints_outfile << action_init_time << " " << (action_init_time + action_duration_time - 0.01) << " " << shared_str << endl;
 					} else {
-						constraints_outfile << action_init_time << " " << (action_init_time + block_var_duration) << " " << shared_str << endl;
+						// A release's own action_init_time runs 0.01 behind
+						// its true completion time. Relay the corrected value
+						// so other agents see the real release time.
+						constraints_outfile << (action_init_time + block_var_duration) << " " << action_init_time << " " << shared_str << endl;
 					}
 		    	}
 		    }
@@ -364,7 +367,7 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 		    int post = prepost[j].post;
 		    //cout << "prepost: " << var << " " << pre << " " << post << endl;
 
-		    if(pre == -2 || pre == -3 || pre == -4 || pre == 5 || pre == -6) continue;
+		    if(pre == -2 || pre == -3 || pre == -4 || pre == -5 || pre == -6) continue;
 
 		    for(int z = 0; z < g_shared_vars.size(); z++)
 		    {
@@ -396,10 +399,11 @@ float save_plan(const vector<const Operator *> &plan, const float cost, const st
 							} */
 							constraints_outfile << action_init_time << " " << (action_init_time + action_duration_time - 0.01) << " " << shared_str << endl;
 						} else {
-							constraints_outfile << action_init_time << " " << (action_init_time + 0.01) << " " << shared_str << endl;
+							// Same correction as the prevail case above.
+							constraints_outfile << (action_init_time + 0.01) << " " << action_init_time << " " << shared_str << endl;
 						}
 		    		} else {
-		    			constraints_outfile << action_init_time << " " << (action_init_time + 0.01) << " " << shared_str << endl;
+		    			constraints_outfile << (action_init_time + 0.01) << " " << action_init_time << " " << shared_str << endl;
 		    		}
 		    	}
 		    }

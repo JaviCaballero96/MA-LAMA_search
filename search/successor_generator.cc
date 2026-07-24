@@ -31,6 +31,12 @@
 
 using namespace std;
 
+// Two agents can compute the same real instant as slightly different
+// floats. This tolerance absorbs that drift when looking up which
+// time-window an action's end time falls into, without affecting
+// clearly-overlapping windows.
+const float SHARED_VAR_TIME_TOLERANCE = 0.02f;
+
 class SuccessorGeneratorSwitch : public SuccessorGenerator {
     int switch_var;
     SuccessorGenerator *immediate_ops;
@@ -194,17 +200,14 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 		if(op->get_name().find("_end") != string::npos)
 		{
 			vector<runn_action>::const_iterator it_ra = curr.running_actions.begin();
-			for(; it_ra != curr.running_actions.end();)
+			for(; it_ra != curr.running_actions.end(); it_ra++)
 			{
 				if((*it_ra).non_temporal_action_name == op->get_non_temporal_action_name())
 				{
 					op_end_time = (*it_ra).time_end;
 					op_duration = (*it_ra).time_end - (*it_ra).time_start;
-				}else{
-					it_ra++;
+					break;
 				}
-
-				break;
 			}
 		} else if(op->get_name().find("_start") != string::npos)
 		{
@@ -256,6 +259,13 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 			}
 		} */
 
+		// A "_start" operator's true time is the current time, not
+		// op_end_time's padded default. Use the real time here so the
+		// lock check is not fooled.
+		float lock_check_time = op_end_time;
+		if(op->get_name().find("_start") != string::npos)
+			lock_check_time = curr.get_g_current_time_value();
+
 		for(int k = 0; (k < g_shared_vars_timed_values.size()) && (op_valid); k++)
 		{
 			vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
@@ -267,8 +277,8 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 					bool tested = false;
 					for(int j = 0; j < (g_shared_vars_timed_values[k]->second->size() - 1); j++)
 					{
-						if((op_end_time > (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
-								(op_end_time <= (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
+						if(((lock_check_time + SHARED_VAR_TIME_TOLERANCE) >= (*(g_shared_vars_timed_values[k]->second))[j]->second) &&
+								((lock_check_time + SHARED_VAR_TIME_TOLERANCE) < (*(g_shared_vars_timed_values[k]->second))[j + 1]->second))
 						{
 							tested = true;
 							if(((*(g_shared_vars_timed_values[k]->second))[j]->first != pp.pre) &&
@@ -276,11 +286,6 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 									((*(g_shared_vars_timed_values[k]->second))[j]->first != -1)
 							  )
 							{
-								/* if((op->get_name().find("_end") != string::npos) && (curr.running_actions.size() != 1))
-								{
-									op_valid = false;
-									break;
-								} else */
 								if(!use_hard_temporal_constraints)
 								{
 									op_valid = false;
@@ -293,6 +298,16 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 									} else if (op->get_name().find("_end") != string::npos){
 										op_valid = false;
 										break;
+									} else if (op->get_name().find("_start") != string::npos) {
+										// Only accept this operator if waiting actually
+										// reaches a time when the variable has the value
+										// it needs. Otherwise reject it.
+										float wait_time = get_new_time_window(*op, &curr, op_duration,
+												*(g_shared_vars_timed_values[k]->second), pp.pre);
+										if(wait_time <= curr.get_g_current_time_value()) {
+											op_valid = false;
+											break;
+										}
 									}
 								}else {
 									op_valid = false;
@@ -300,11 +315,6 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 								}
 							} else if(op_duration > (((*(g_shared_vars_timed_values[k]->second))[j + 1]->second) - (curr.get_g_current_time_value())))
 							{
-								/* if((op->get_name().find("_end") != string::npos) && (curr.running_actions.size() != 1))
-								{
-									op_valid = false;
-									break;
-								} else */
 								if(!use_hard_temporal_constraints)
 								{
 									op_valid = false;
@@ -317,6 +327,13 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 									} else if (op->get_name().find("_end") != string::npos){
 										op_valid = false;
 										break;
+									} else if (op->get_name().find("_start") != string::npos) {
+										float wait_time = get_new_time_window(*op, &curr, op_duration,
+												*(g_shared_vars_timed_values[k]->second), pp.pre);
+										if(wait_time <= curr.get_g_current_time_value()) {
+											op_valid = false;
+											break;
+										}
 									}
 								}
 							}
@@ -335,18 +352,10 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 						}
 					}
 
-					// A release (pure effect, pp.pre == -1, e.g. "(at end
-					// (free ?from))") has no precondition value to compare
-					// above, and op_end_time here already equals "now" (the
-					// completion instant) -- comparing this one flight's
-					// own duration against "the next boundary from now"
-					// can never see a conflict that happened earlier in a
-					// hold built from several hops (acquire, then a chain
-					// of depart-and-immediately-reacquire, then finally
-					// this release). Scan the WHOLE unbroken hold instead,
-					// anchored at when it actually started (tracked in
-					// curr.shared_var_last_touch), for any external
-					// transition that landed inside it.
+					// A release has no precondition value to compare
+					// above. Check the whole span since the last
+					// acquire instead, for any external transition
+					// inside it.
 					if(op_valid && (pp.pre == -1))
 					{
 						map<int, float>::const_iterator it_anchor = curr.shared_var_last_touch.find(pp.var);
@@ -368,17 +377,10 @@ void check_external_locks_validity(const State &curr, vector<const Operator *> &
 			}
 		}
 
-		// The check above only fires when THIS candidate operator's own
-		// pre/post touches a shared variable. But time keeps advancing to
-		// op_end_time regardless of what this operator does. If we are
-		// still sitting on an earlier, unresolved claim to some OTHER
-		// shared variable (recorded in curr.shared_var_last_touch when we
-		// acquired/released it) and an external agent's timeline shows ANY
-		// transition of that same variable since then, that is a genuine
-		// conflict -- even though comparing raw encoded values (as the
-		// check above does) cannot see it, since both sides can show the
-		// same "not free" value for entirely different reasons (we hold it
-		// for our own reason; they now also claim it for theirs).
+		// The check above only runs for variables this operator touches.
+		// Also check any other variable we still hold, in case an
+		// external agent's timeline shows a transition since we last
+		// touched it.
 		for(map<int, float>::const_iterator it_lt = curr.shared_var_last_touch.begin();
 				it_lt != curr.shared_var_last_touch.end() && op_valid; ++it_lt)
 		{
