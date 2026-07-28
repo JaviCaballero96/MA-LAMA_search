@@ -547,8 +547,14 @@ void check_temporal_goals_validity(const State &curr, vector<const Operator *> &
 		const Operator * op = *it;
 		bool op_valid = true;
 
-		// Obtain the end time of the action
-		/* float action_end_time = 0.0;
+		// A "_start" operator is validated at its own start time (curr's
+		// current time). A "_end" operator's over-all conditions must still
+		// hold at the action's actual end time, which is later than curr's
+		// current time (curr only advances to op_end_time once the _end
+		// operator is applied) -- look it up from the pending running action
+		// instead, so a deadline that falls *during* the action's execution
+		// is still caught.
+		float deadline_check_time = curr.get_g_current_time_value();
 		if(op->get_name().find("_end") != string::npos)
 		{
 			vector<runn_action>::const_iterator it_ra_const = curr.running_actions.begin();
@@ -556,14 +562,11 @@ void check_temporal_goals_validity(const State &curr, vector<const Operator *> &
 			{
 				if((*it_ra_const).non_temporal_action_name == op->get_non_temporal_action_name())
 				{
-					action_end_time = (*it_ra_const).time_end;
+					deadline_check_time = (*it_ra_const).time_end;
 					break;
 				}
 			}
-
-		} else {
-			action_end_time = curr.get_g_current_time_value() + 0.01;
-		} */
+		}
 
 		// If the end_time has been extracted successfully,
 		// check the attained goals and delete operators that provoke invalid states
@@ -577,7 +580,7 @@ void check_temporal_goals_validity(const State &curr, vector<const Operator *> &
 						if((prepost.pre > -1) && (prepost.var == g_timed_goals[i].second[j].first.first)) {
 							// The var needs to have a certain value by the operator
 							// Check if the application time is later than the negative timed fact
-							if(curr.get_g_current_time_value() > g_timed_goals[i].second[j].second) {
+							if(deadline_check_time > g_timed_goals[i].second[j].second) {
 								op_valid = false;
 								/* cout << "The action " << op->get_name() << " needs the value " <<
 										g_timed_goals[i].second[j].first.first << "," <<
@@ -586,6 +589,22 @@ void check_temporal_goals_validity(const State &curr, vector<const Operator *> &
 								cout << "The current time is " << curr.get_g_current_time_value() <<
 										". Therefore, this search branch will not continue." << endl;
 										*/
+							}
+						}
+						// A variable governed by a negative TIL deadline can also appear
+						// as a plain (over all) prevail condition rather than a PrePost
+						// entry (e.g. unload_lab's "on_time" requirement, which the
+						// action reads but never modifies). Without this, deadlines on
+						// such variables were never enforced. Using deadline_check_time
+						// (rather than curr's own current time) also catches the case
+						// where an action starts before the deadline but its own
+						// duration would carry it past the deadline while still running.
+						for (int k = 0; k < op->get_prevail().size(); k++) {
+							Prevail prevail = op->get_prevail()[k];
+							if(prevail.var == g_timed_goals[i].second[j].first.first) {
+								if(deadline_check_time > g_timed_goals[i].second[j].second) {
+									op_valid = false;
+								}
 							}
 						}
 					}
