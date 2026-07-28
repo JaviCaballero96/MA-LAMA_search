@@ -451,11 +451,13 @@ void process_shared_vars_values()
 		shared_var_pair_list->first = g_shared_vars[i].second;
 
 		vector<pair<int, float>* > *var_timed_values = new vector<pair<int, float>* >();
+		vector<int> *var_pre_values = new vector<int>();
 
 		pair<int, float> *first_value = new pair<int, float>();
 		first_value->first = int(-1);
 		first_value->second = float(0.00);
 		var_timed_values->push_back(first_value);
+		var_pre_values->push_back(-1);
 
 		// Walk this var's constraint entries in chronological order.
 		// When two entries share the same time (a release and an
@@ -506,6 +508,7 @@ void process_shared_vars_values()
 					timed_value->second = external_blocked_vars[min_index]->time_set;
 
 					var_timed_values->push_back(timed_value);
+					var_pre_values->push_back(external_blocked_vars[min_index]->val_pre);
 				}
 			}
 		}
@@ -513,6 +516,7 @@ void process_shared_vars_values()
 
 		shared_var_pair_list->second = var_timed_values;
 		g_shared_vars_timed_values.push_back(shared_var_pair_list);
+		g_shared_vars_pre_values.push_back(var_pre_values);
 	}
 
 
@@ -646,6 +650,7 @@ std::unordered_map<string, int> g_instantiated_funcs_dict;
 ExternalFunctionManager g_ext_func_manager;
 vector<pair<string, int> > g_shared_vars;
 vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
+vector<vector<int>* > g_shared_vars_pre_values;
 vector<pair<string, int> > external_init_state_vars;
 vector<pair<string, float> > external_init_state_numeric_vars;
 vector<Operator> g_operators;

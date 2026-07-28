@@ -92,6 +92,11 @@ extern std::unordered_map<string, int> g_instantiated_funcs_dict;
 extern ExternalFunctionManager g_ext_func_manager;
 extern vector<pair<string, int> > g_shared_vars;
 extern vector<pair<int, vector<pair<int, float>* >* >* > g_shared_vars_timed_values;
+// Parallel to g_shared_vars_timed_values: for the same index k and the
+// same j, the precondition value that transition j required. Used to
+// validate a just-found plan's own shared-variable transitions against
+// the relayed ones, once merged and walked in chronological order.
+extern vector<vector<int>* > g_shared_vars_pre_values;
 extern vector<Operator> g_operators;
 extern vector<Operator> g_axioms;
 extern AxiomEvaluator *g_axiom_evaluator;

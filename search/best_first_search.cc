@@ -31,6 +31,7 @@
 #include "landmarks_count_heuristic.h"
 
 #include <cassert>
+#include <algorithm>
 using namespace std;
 
 OpenListInfo::OpenListInfo(Heuristic *heur, bool only_pref) {
@@ -110,7 +111,93 @@ int BestFirstSearchEngine::step() {
     return fetch_next_state();
 }
 
-bool BestFirstSearchEngine::is_dead_end() {    
+// Merge a candidate plan's own shared-variable transitions with the
+// ones already relayed from earlier-solved agents, and check that the
+// whole chronological sequence is self-consistent: every transition's
+// precondition must match the value the immediately preceding
+// transition left the variable at. Checking only against the relayed
+// timeline's value "at the time" an action fires (as the ordinary
+// validity checks do) cannot see this: an agent solved first commits
+// to a transition with no knowledge of anyone else, and a later agent
+// can independently cause an earlier transition on the same variable
+// that quietly invalidates it, without either agent's own, local view
+// ever showing a conflict.
+static bool transition_time_order(
+		const pair<float, pair<int, int> > &a,
+		const pair<float, pair<int, int> > &b) {
+	if(a.first != b.first)
+		return a.first < b.first;
+	// Ties are broken the same way the relayed timeline itself is
+	// built: a release (no precondition of its own) before an acquire.
+	bool a_is_release = (a.second.first == -1);
+	bool b_is_release = (b.second.first == -1);
+	if(a_is_release != b_is_release)
+		return a_is_release;
+	return false;
+}
+
+bool plan_respects_shared_var_transitions(
+		const vector<const Operator *> &plan, const vector<State> &states_plan) {
+	for(int k = 0; k < g_shared_vars_timed_values.size(); k++)
+	{
+		int local_var = g_shared_vars_timed_values[k]->first;
+
+		// This plan's own transitions on this shared variable.
+		vector<pair<float, pair<int, int> > > merged;
+		for(int i = 0; i < plan.size(); i++)
+		{
+			const Operator *op = plan[i];
+			float t = states_plan[i + 1].get_g_current_time_value();
+
+			bool touched = false;
+			for(vector<PrePost>::const_iterator it_pp = op->get_pre_post().begin();
+					it_pp != op->get_pre_post().end(); ++it_pp)
+			{
+				if(it_pp->var == local_var) {
+					merged.push_back(make_pair(t, make_pair(it_pp->pre, it_pp->post)));
+					touched = true;
+					break;
+				}
+			}
+			if(touched)
+				continue;
+			for(vector<Prevail>::const_iterator it_pv = op->get_prevail().begin();
+					it_pv != op->get_prevail().end(); ++it_pv)
+			{
+				if(it_pv->var == local_var) {
+					merged.push_back(make_pair(t, make_pair(it_pv->prev, it_pv->prev)));
+					break;
+				}
+			}
+		}
+
+		if(merged.empty())
+			continue;
+
+		// The relayed transitions from earlier-solved agents (skip the
+		// "-1 at time 0" placeholder used only to seed the timeline).
+		vector<pair<int, float>* > &ext_transitions = *(g_shared_vars_timed_values[k]->second);
+		vector<int> &ext_pre_values = *(g_shared_vars_pre_values[k]);
+		for(int j = 1; j < ext_transitions.size(); j++)
+			merged.push_back(make_pair(ext_transitions[j]->second,
+					make_pair(ext_pre_values[j], ext_transitions[j]->first)));
+
+		sort(merged.begin(), merged.end(), transition_time_order);
+
+		int last_val = -1;
+		for(int i = 0; i < merged.size(); i++)
+		{
+			int pre = merged[i].second.first;
+			int post = merged[i].second.second;
+			if((pre != -1) && (last_val != -1) && (pre != last_val))
+				return false;
+			last_val = post;
+		}
+	}
+	return true;
+}
+
+bool BestFirstSearchEngine::is_dead_end() {
     // If a reliable heuristic reports a dead end, we trust it.
     // Otherwise, all heuristics must agree on dead-end-ness.
     int dead_end_counter = 0;
@@ -145,9 +232,14 @@ bool BestFirstSearchEngine::check_goal() {
 	    for(int i = 0; i < g_goal.size(); i++)
 		if(current_state[g_goal[i].first] != g_goal[i].second)
 		    return false;
-	cout << "Solution found!" << endl;
+
 	Plan plan;
 	vector<State> states_plan = closed_list.trace_path(current_state, plan);
+
+	if(!plan_respects_shared_var_transitions(plan, states_plan))
+	    return false;
+
+	cout << "Solution found!" << endl;
 	vector<float> plan_temporal_info;
 	for(int i = 1; i < states_plan.size(); i++)
 	{
